@@ -1,0 +1,80 @@
+[
+  {
+    "Name": "Avalanche Vandal",
+    "LocalizedNames": {
+      "ar-AE": "أفالانتش فاندال",
+      "de-DE": "Vandal – Avalanche",
+      "en-US": "Avalanche Vandal",
+      "es-ES": "Vandal Avalanche",
+      "es-MX": "Vandal Avalancha",
+      "fr-FR": "Vandal (Avalanche)",
+      "id-ID": "Avalanche Vandal",
+      "it-IT": "Vandal Valanga",
+      "ja-JP": "アヴァランチ ヴァンダル",
+      "ko-KR": "아발란체 밴달",
+      "pl-PL": "Vandal Lawina",
+      "pt-BR": "Vandal Avalanche",
+      "ru-RU": "Vandal \"Лавина\"",
+      "th-TH": "Avalanche Vandal",
+      "tr-TR": "BUZUL VANDAL",
+      "vi-VN": "Vandal Băng Giá",
+      "zh-CN": "寒冬兵器 狂徒",
+      "zh-TW": "雪崩 暴徒"
+    },
+    "Id": "41B55C92-4AEB-9C86-854A-4ABCD48EA0BA",
+    "AssetName": "Default__AK_Ice_PrimaryAsset_C",
+    "AssetPath": ""
+  },
+  {
+    "Name": "BlastX Frenzy",
+    "LocalizedNames": {
+      "ar-AE": "بلاست إكس فرينزي",
+      "de-DE": "Frenzy – BlastX",
+      "en-US": "BlastX Frenzy",
+      "es-ES": "Frenzy BlastX",
+      "es-MX": "Frenzy BlastX",
+      "fr-FR": "Frenzy (BlastX)",
+      "id-ID": "BlastX Frenzy",
+      "it-IT": "Frenzy BlastX",
+      "ja-JP": "ブラストX フレンジー",
+      "ko-KR": "블라스트X 프렌지",
+      "pl-PL": "Frenzy BlastX",
+      "pt-BR": "Frenzy BlastX",
+      "ru-RU": "Frenzy \"BlastX\"",
+      "th-TH": "BlastX Frenzy",
+      "tr-TR": "BlastX FRENZY",
+      "vi-VN": "Frenzy BlastX",
+      "zh-CN": "砰砰X特攻队 狂怒",
+      "zh-TW": "咻咻X 狂弒"
+    },
+    "Id": "79005812-4D5C-CC6D-E2BD-19BC86C29349",
+    "AssetName": "Default__AutoPistol_URF_PrimaryAsset_C",
+    "AssetPath": ""
+  },
+  {
+    "Name": "BlastX Odin",
+    "LocalizedNames": {
+      "ar-AE": "بلاست إكس أودين",
+      "de-DE": "Odin – BlastX",
+      "en-US": "BlastX Odin",
+      "es-ES": "Odin BlastX",
+      "es-MX": "Odin BlastX",
+      "fr-FR": "Odin (BlastX)",
+      "id-ID": "BlastX Odin",
+      "it-IT": "Odin BlastX",
+      "ja-JP": "ブラストX オーディン",
+      "ko-KR": "블라스트X 오딘",
+      "pl-PL": "Odin BlastX",
+      "pt-BR": "Odin BlastX",
+      "ru-RU": "Odin \"BlastX\"",
+      "th-TH": "BlastX Odin",
+      "tr-TR": "BlastX ODIN",
+      "vi-VN": "Odin BlastX",
+      "zh-CN": "砰砰X特攻队 奥丁",
+      "zh-TW": "咻咻X 奧丁"
+    },
+    "Id": "85ED3F9D-4E59-A709-8FAF-BC86EFFB3A07",
+    "AssetName": "Default__HeavyMachineGun_URF_PrimaryAsset_C",
+    "AssetPath": ""
+  }
+]
