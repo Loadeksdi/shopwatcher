@@ -26,32 +26,6 @@
     "AssetPath": ""
   },
   {
-    "Name": "BlastX Frenzy",
-    "LocalizedNames": {
-      "ar-AE": "بلاست إكس فرينزي",
-      "de-DE": "Frenzy – BlastX",
-      "en-US": "BlastX Frenzy",
-      "es-ES": "Frenzy BlastX",
-      "es-MX": "Frenzy BlastX",
-      "fr-FR": "Frenzy (BlastX)",
-      "id-ID": "BlastX Frenzy",
-      "it-IT": "Frenzy BlastX",
-      "ja-JP": "ブラストX フレンジー",
-      "ko-KR": "블라스트X 프렌지",
-      "pl-PL": "Frenzy BlastX",
-      "pt-BR": "Frenzy BlastX",
-      "ru-RU": "Frenzy \"BlastX\"",
-      "th-TH": "BlastX Frenzy",
-      "tr-TR": "BlastX FRENZY",
-      "vi-VN": "Frenzy BlastX",
-      "zh-CN": "砰砰X特攻队 狂怒",
-      "zh-TW": "咻咻X 狂弒"
-    },
-    "Id": "79005812-4D5C-CC6D-E2BD-19BC86C29349",
-    "AssetName": "Default__AutoPistol_URF_PrimaryAsset_C",
-    "AssetPath": ""
-  },
-  {
     "Name": "BlastX Odin",
     "LocalizedNames": {
       "ar-AE": "بلاست إكس أودين",

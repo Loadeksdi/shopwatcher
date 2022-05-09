@@ -1,10 +1,12 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"sort"
 
@@ -54,7 +56,38 @@ type GlobalStore struct {
 }
 
 var globalStore = GlobalStore{}
-var client = &http.Client{}
+var cj, _ = cookiejar.New(nil)
+var defaultTransport = http.DefaultTransport.(*http.Transport)
+var customTransport = &http.Transport{
+	Proxy:                 defaultTransport.Proxy,
+	DialContext:           defaultTransport.DialContext,
+	MaxIdleConns:          defaultTransport.MaxIdleConns,
+	IdleConnTimeout:       defaultTransport.IdleConnTimeout,
+	ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
+	TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
+	TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS12, PreferServerCipherSuites: false,
+		CipherSuites: []uint16{
+			tls.TLS_CHACHA20_POLY1305_SHA256,
+			tls.TLS_AES_128_GCM_SHA256,
+			tls.TLS_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+			tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+		}},
+}
+var client = &http.Client{Jar: cj, Transport: customTransport}
+
 var locale string
 
 func fetchSkins() ([]Skin, error) {
@@ -73,6 +106,9 @@ func fetchSkins() ([]Skin, error) {
 	err = json.NewDecoder(res.Body).Decode(&response)
 	if err != nil {
 		return nil, err
+	}
+	for _, skin := range response.Skins {
+		skin.AssetPath = "https://github.com/InFinity54/Valorant_DDragon/blob/master/WeaponSkins/" + skin.Id + ".png"
 	}
 	return response.Skins, nil
 }
@@ -95,7 +131,7 @@ func feedData() {
 	globalStore.Ui.skinsListBox.FeedList(res)
 }
 
-func saveData() {
+func saveSkinsData() {
 	json, err := json.MarshalIndent(globalStore.Ui.selectedSkinsListBox.AllSkins, "", "  ")
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not save the data", walk.MsgBoxIconError)
@@ -112,16 +148,18 @@ func saveData() {
 //go:generate go-winres make --product-version=dev
 
 func main() {
+	var mw *walk.MainWindow
 	var err error
 	locale, err = lang.DetectIETF()
 	if err != nil {
 		locale = "en-US"
 	}
 	loadSavedSkins()
-	window := MainWindow{
-		Title:   "Valorant Shopwatcher",
-		MinSize: Size{600, 400},
-		Layout:  VBox{},
+	MainWindow{
+		AssignTo: &mw,
+		Title:    "Valorant Shopwatcher",
+		MinSize:  Size{Width: 600, Height: 400},
+		Layout:   VBox{},
 		Children: []Widget{
 			Composite{
 				Layout: HBox{},
@@ -148,7 +186,7 @@ func main() {
 								OnClicked: func() {
 									globalStore.Ui.selectedSkinsListBox.FeedList(append(globalStore.Ui.selectedSkinsListBox.AllSkins, globalStore.Ui.skinsListBox.SelectedSkins...))
 									globalStore.Ui.skinsListBox.SetSelectedIndexes([]int{})
-									saveData()
+									saveSkinsData()
 								},
 							},
 							PushButton{
@@ -159,7 +197,7 @@ func main() {
 									}
 									globalStore.Ui.selectedSkinsListBox.FeedList(globalStore.Ui.selectedSkinsListBox.AllSkins)
 									globalStore.Ui.selectedSkinsListBox.SetSelectedIndexes([]int{})
-									saveData()
+									saveSkinsData()
 								},
 							},
 						},
@@ -168,10 +206,10 @@ func main() {
 						Layout: VBox{},
 						Children: []Widget{
 							Label{
-								Text: "Selected skins",
+								Text: "My watchlist",
 							},
 							ListBox{
-								Name:                     "Selected skins",
+								Name:                     "My watchlist",
 								MultiSelection:           true,
 								Model:                    &globalStore.Ui.selectedSkinsListBox,
 								AssignTo:                 &globalStore.Ui.selectedSkinsListBox.ListBox,
@@ -181,8 +219,20 @@ func main() {
 					},
 				},
 			},
+			Label{
+				Text: "My current shop",
+			},
+			ListBox{
+				Name: "Shop",
+			},
 		},
+	}.Create()
+	user, err := loadSavedUser()
+	if err != nil {
+		user = drawUserform(mw)
+	}
+	if user.Login == "" {
 	}
 	go feedData()
-	window.Run()
+	mw.Run()
 }
