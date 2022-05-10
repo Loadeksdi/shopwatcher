@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
@@ -227,10 +228,12 @@ func main() {
 			},
 		},
 	}.Create()
+	var skins []Skin
 	user, err := loadSavedUser()
 	if err != nil {
-		user = drawUserform(mw)
+		user, skins = drawUserform(mw)
 	}
+	fmt.Println(skins)
 	if user.Login == "" {
 	}
 	go feedData()

@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/akavel/rsrc v0.10.2 // indirect
 	github.com/cloudfoundry-attic/jibber_jabber v0.0.0-20151120183258-bcc4c8345a21 // indirect
+	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/gen2brain/beeep v0.0.0-20220402123239-6a3042f4b71a // indirect
 	github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect

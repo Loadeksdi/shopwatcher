@@ -3,13 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
+	"regexp"
+	"strings"
 
+	"github.com/danieljoos/wincred"
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
 )
@@ -70,6 +70,62 @@ type AccessTokenContainer struct {
 	Country string `json:"country"`
 }
 
+type EntitlementResponse struct {
+	EntitlementsToken string `json:"entitlements_token"`
+}
+
+type UserId struct {
+	Sub string `json:"sub"`
+}
+
+type Shop struct {
+	FeaturedBundle struct {
+		Bundle struct {
+			ID          string `json:"ID"`
+			DataAssetID string `json:"DataAssetID"`
+			CurrencyID  string `json:"CurrencyID"`
+			Items       []struct {
+				Item struct {
+					ItemTypeID string `json:"ItemTypeID"`
+					ItemID     string `json:"ItemID"`
+					Amount     int    `json:"Amount"`
+				} `json:"Item"`
+				BasePrice       int    `json:"BasePrice"`
+				CurrencyID      string `json:"CurrencyID"`
+				DiscountPercent int    `json:"DiscountPercent"`
+				DiscountedPrice int    `json:"DiscountedPrice"`
+				IsPromoItem     bool   `json:"IsPromoItem"`
+			} `json:"Items"`
+			DurationRemainingInSeconds int  `json:"DurationRemainingInSeconds"`
+			WholesaleOnly              bool `json:"WholesaleOnly"`
+		} `json:"Bundle"`
+		Bundles []struct {
+			ID          string `json:"ID"`
+			DataAssetID string `json:"DataAssetID"`
+			CurrencyID  string `json:"CurrencyID"`
+			Items       []struct {
+				Item struct {
+					ItemTypeID string `json:"ItemTypeID"`
+					ItemID     string `json:"ItemID"`
+					Amount     int    `json:"Amount"`
+				} `json:"Item"`
+				BasePrice       int    `json:"BasePrice"`
+				CurrencyID      string `json:"CurrencyID"`
+				DiscountPercent int    `json:"DiscountPercent"`
+				DiscountedPrice int    `json:"DiscountedPrice"`
+				IsPromoItem     bool   `json:"IsPromoItem"`
+			} `json:"Items"`
+			DurationRemainingInSeconds int  `json:"DurationRemainingInSeconds"`
+			WholesaleOnly              bool `json:"WholesaleOnly"`
+		} `json:"Bundles"`
+		BundleRemainingDurationInSeconds int `json:"BundleRemainingDurationInSeconds"`
+	} `json:"FeaturedBundle"`
+	SkinsPanelLayout struct {
+		SingleItemOffers                           []string `json:"SingleItemOffers"`
+		SingleItemOffersRemainingDurationInSeconds int      `json:"SingleItemOffersRemainingDurationInSeconds"`
+	} `json:"SkinsPanelLayout"`
+}
+
 func (urlVar *ParsedURL) UnmarshalJSON(data []byte) error {
 	var s string
 	err := json.Unmarshal(data, &s)
@@ -86,38 +142,31 @@ func (urlVar *ParsedURL) UnmarshalJSON(data []byte) error {
 
 func loadSavedUser() (User, error) {
 	var user User
-	file, err := os.ReadFile("saves/user.json")
-	if err != nil {
-		return user, err
-	}
-	err = json.Unmarshal(file, &user)
-	if err != nil {
-		walk.MsgBox(nil, "Error", "The app could not load user information", walk.MsgBoxIconError)
-	}
+	cred, err := wincred.GetGenericCredential("ValorantShopwatcher")
+    if err == nil {
+		s := strings.Split(string(cred.CredentialBlob), ":")
+		user = User{s[0], s[1], s[2]}
+    } 
 	return user, nil
 }
 
 func saveUserData(user User) {
-	json, err := json.MarshalIndent(user, "", "  ")
-	if err != nil {
-		walk.MsgBox(nil, "Error", "The app could not save your login data", walk.MsgBoxIconError)
-	}
-	if _, err := os.Stat("saves"); os.IsNotExist(err) {
-		os.Mkdir("saves", 0777)
-	}
-	err = ioutil.WriteFile("saves/user.json", json, 0644)
-	if err != nil {
-		walk.MsgBox(nil, "Error", "The app could not save your login data", walk.MsgBoxIconError)
-	}
+	cred := wincred.NewGenericCredential("ValorantShopwatcher")
+    cred.CredentialBlob = []byte(user.Login + ":" + user.Password + ":" + user.Region)
+    err := cred.Write()
+    if err != nil {
+        walk.MsgBox(nil, "Error", "The app could not save your credentials", walk.MsgBoxIconError)
+    }
 }
 
 var userForm *walk.Dialog
 
-func drawUserform(owner walk.Form) User {
+func drawUserform(owner walk.Form) (User, []Skin) {
 	var outLELogin *walk.LineEdit
 	var outLEPassword *walk.LineEdit
 	var outCBRegion *walk.ComboBox
 	var user User
+	var skins []Skin
 	var dialog = Dialog{
 		AssignTo: &userForm,
 		Title:    "Login",
@@ -166,20 +215,21 @@ func drawUserform(owner walk.Form) User {
 				Text: "Log in",
 				OnClicked: func() {
 					user = User{Login: outLELogin.Text(), Password: outLEPassword.Text(), Region: outCBRegion.Text()}
-					_, err := checkUserCreds(user)
+					accessToken, err := getAccessToken(user)
 					if err != nil {
 						walk.MsgBox(nil, "Error", "Invalid credentials", walk.MsgBoxIconError)
 					}
 					saveUserData(user)
+					skins, _ = fetchSkinsWithToken(accessToken, user)
 				},
 			},
 		},
 	}
 	dialog.Run(owner)
-	return user
+	return user, skins
 }
 
-func checkUserCreds(user User) (string, error) {
+func getAccessToken(user User) (string, error) {
 	body, _ := json.Marshal(AuthBody{Client_id: "play-valorant-web-prod", Nonce: 1, Redirect_uri: "https://playvalorant.com/opt_in", Response_type: "token id_token", Scope: "account openid"})
 	req, _ := http.NewRequest("POST", "https://auth.riotgames.com/api/v1/authorization", bytes.NewBuffer(body))
 	setRequestHeaders(req)
@@ -195,25 +245,22 @@ func checkUserCreds(user User) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var accessTokenContainer AccessTokenContainer
+	var mfaResponse MFAResponse
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return "", err
 	}
 	defer res.Body.Close()
-	err = json.Unmarshal(data, &accessTokenContainer)
+	var accessToken string
+	err = json.Unmarshal(data, &mfaResponse)
 	if err == nil {
-		accessToken := accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
-		fmt.Println(accessToken)
+		accessToken = MFAModal(userForm, user, mfaResponse.Multifactor.MultiFactorCodeLength)
 	} else {
-		var mfaResponse MFAResponse
-		err = json.Unmarshal(data, &mfaResponse)
-		if err != nil {
-			return "", err
-		}
-		MFAModal(userForm, mfaResponse.Multifactor.MultiFactorCodeLength)
+		var accessTokenContainer AccessTokenContainer
+		json.Unmarshal(data, &accessTokenContainer)
+		accessToken = accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
 	}
-	return "ok", nil
+	return accessToken, nil
 }
 
 func setRequestHeaders(req *http.Request) *http.Request {
@@ -222,8 +269,9 @@ func setRequestHeaders(req *http.Request) *http.Request {
 	return req
 }
 
-func MFAModal(owner walk.Form, codeLength int) {
+func MFAModal(owner walk.Form, user User, codeLength int) string {
 	var outLECode *walk.LineEdit
+	var accessToken string
 	Dialog{
 		Title:   "Multi-factor authentication enabled",
 		MinSize: Size{Width: 200, Height: 250},
@@ -249,14 +297,64 @@ func MFAModal(owner walk.Form, codeLength int) {
 					}
 					defer res.Body.Close()
 					var accessTokenContainer AccessTokenContainer
-					err = json.NewDecoder(res.Body).Decode(&accessTokenContainer)
+					data, _ := io.ReadAll(res.Body)
+					err = json.Unmarshal(data, &accessTokenContainer)
 					if err != nil {
 						walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
 					}
-					accessToken := accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
-					fmt.Println(accessToken)
+					re, _ := regexp.Compile("access_token=([^&]*)")
+					accessTokenString := re.FindString(accessTokenContainer.Response.Parameters.Uri.Fragment)
+					accessToken = accessTokenString[13:]
 				},
 			},
 		},
 	}.Run(owner)
+	return accessToken
+}
+
+func fetchSkinsWithToken(accessToken string, user User) ([]Skin, error) {
+	req, _ := http.NewRequest("POST", "https://entitlements.auth.riotgames.com/api/token/v1", nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		walk.MsgBox(nil, "Error", "Couldn't fetch account information", walk.MsgBoxIconError)
+	}
+	defer res.Body.Close()
+	var entitlementResponse EntitlementResponse
+	json.NewDecoder(res.Body).Decode(&entitlementResponse)
+	req, _ = http.NewRequest("POST", "https://auth.riotgames.com/userinfo", nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Riot-Entitlements-JWT", entitlementResponse.EntitlementsToken)
+	res, err = client.Do(req)
+	if err != nil {
+		walk.MsgBox(nil, "Error", "Couldn't fetch account information", walk.MsgBoxIconError)
+	}
+	defer res.Body.Close()
+	var userId UserId
+	json.NewDecoder(res.Body).Decode(&userId)
+	req, _ = http.NewRequest("GET", "https://pd." + user.Region + ".a.pvp.net/store/v2/storefront/" + userId.Sub, nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Riot-Entitlements-JWT", entitlementResponse.EntitlementsToken)
+	res, err = client.Do(req)
+	if err != nil {
+		walk.MsgBox(nil, "Error", "Couldn't fetch account information", walk.MsgBoxIconError)
+	}
+	defer res.Body.Close()
+	var shop Shop
+	err = json.NewDecoder(res.Body).Decode(&shop)
+	if err != nil {
+		walk.MsgBox(nil, "Error", "Couldn't fetch store information", walk.MsgBoxIconError)
+	}
+	var skinsInShop []Skin
+	for _, tmpSkin := range shop.SkinsPanelLayout.SingleItemOffers {
+		for _, skin := range globalStore.Ui.skinsListBox.AllSkins{
+			if tmpSkin == skin.Id {
+				skinsInShop = append(skinsInShop, skin)
+			}
+		}
+	}
+	return skinsInShop, nil
 }
