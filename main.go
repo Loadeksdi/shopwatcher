@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
@@ -50,10 +49,14 @@ type Skin struct {
 type UiElems struct {
 	skinsListBox         MultiSelectList
 	selectedSkinsListBox MultiSelectList
+	shop                 *walk.Composite
+	mainWindow           *walk.MainWindow
 }
 
 type GlobalStore struct {
-	Ui UiElems
+	Ui          UiElems
+	CurrentShop []Skin
+	User        User
 }
 
 var globalStore = GlobalStore{}
@@ -93,7 +96,7 @@ var locale string
 
 func fetchSkins() ([]Skin, error) {
 	req, _ := http.NewRequest("GET", "https://eu.api.riotgames.com/val/content/v1/contents?locale="+locale, nil)
-	apiKey, err := base64.StdEncoding.DecodeString("UkdBUEktMTkxOGFmYWYtYjg5ZS00MzA3LTg2YzctYzNiYTQ5MmY0Njcz")
+	apiKey, err := base64.StdEncoding.DecodeString("UkdBUEktMmNiYTdjOGQtZWFlMy00ZTk0LThlY2EtMGRkOWU0MzhiZmI0")
 	if err != nil {
 		return nil, err
 	}
@@ -146,18 +149,35 @@ func saveSkinsData() {
 	}
 }
 
+func seedUser() {
+	if globalStore.User.Login == "" {
+		drawUserform(globalStore.Ui.mainWindow)
+	}
+	accessToken, err := getAccessToken()
+	if err != nil {
+		walk.MsgBox(nil, "Error", "The app could not call Riot servers", walk.MsgBoxIconError)
+	}
+	globalStore.CurrentShop, err = fetchSkinsWithToken(accessToken)
+	if err != nil {
+		walk.MsgBox(nil, "Error", "The app could not fetch skins", walk.MsgBoxIconError)
+	}
+}
+
 //go:generate go-winres make --product-version=dev
 
 func main() {
-	var mw *walk.MainWindow
+	var db *walk.DataBinder
 	var err error
 	locale, err = lang.DetectIETF()
 	if err != nil {
 		locale = "en-US"
 	}
+	globalStore.User, _ = loadSavedUser()
+
 	loadSavedSkins()
+	globalStore.CurrentShop = []Skin{{}, {}, {}, {}}
 	MainWindow{
-		AssignTo: &mw,
+		AssignTo: &globalStore.Ui.mainWindow,
 		Title:    "Valorant Shopwatcher",
 		MinSize:  Size{Width: 600, Height: 400},
 		Layout:   VBox{},
@@ -223,19 +243,64 @@ func main() {
 			Label{
 				Text: "My current shop",
 			},
-			ListBox{
-				Name: "Shop",
+			Composite{
+				AssignTo: &globalStore.Ui.shop,
+				Layout:   HBox{},
+				Children: []Widget{
+					Composite{
+						DataBinder: DataBinder{
+							AssignTo:       &db,
+							DataSource:     globalStore.CurrentShop[0],
+							ErrorPresenter: ToolTipErrorPresenter{},
+						},
+						Layout: VBox{},
+						Children: []Widget{
+							ImageView{
+								Image: nil,
+							},
+							LineEdit{
+								Text: Bind("Name"),
+							},
+						},
+					},
+					Composite{
+						Layout: VBox{},
+						Children: []Widget{
+							ImageView{
+								Image: nil,
+							},
+							Label{
+								Name: "Skin2",
+							},
+						},
+					},
+					Composite{
+						Layout: VBox{},
+						Children: []Widget{
+							ImageView{
+								Image: nil,
+							},
+							Label{
+								Name: "Skin3",
+							},
+						},
+					},
+					Composite{
+						Layout: VBox{},
+						Children: []Widget{
+							ImageView{
+								Image: nil,
+							},
+							Label{
+								Name: "Skin4",
+							},
+						},
+					},
+				},
 			},
 		},
 	}.Create()
-	var skins []Skin
-	user, err := loadSavedUser()
-	if err != nil {
-		user, skins = drawUserform(mw)
-	}
-	fmt.Println(skins)
-	if user.Login == "" {
-	}
+	go seedUser()
 	go feedData()
-	mw.Run()
+	globalStore.Ui.mainWindow.Run()
 }
