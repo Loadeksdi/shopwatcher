@@ -40,6 +40,27 @@ func (m *MultiSelectList) SelectedIndexesChanged() {
 	}
 }
 
+func (m *MultiSelectList) checkIfSkinIsAlreadySelected(skin Skin) bool {
+	for _, alreadySelectedSkin := range m.AllSkins {
+		if alreadySelectedSkin.Id == skin.Id {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *MultiSelectList) InsertSelectedSkins(skins []Skin) {
+	var sortedSkins SortedSkins = m.AllSkins 
+	for _, skin := range skins {
+		if !m.checkIfSkinIsAlreadySelected(skin) {
+			sortedSkins = append(sortedSkins, skin)
+		}
+	}
+	sort.Sort(sortedSkins)
+	m.AllSkins = sortedSkins
+	m.SetModel(m)
+}
+
 func remove(slice []Skin, s int) []Skin {
 	return append(slice[:s], slice[s+1:]...)
 }

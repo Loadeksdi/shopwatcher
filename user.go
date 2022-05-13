@@ -82,58 +82,48 @@ type UserId struct {
 }
 
 type Shop struct {
-	FeaturedBundle struct {
-		Bundle struct {
-			ID          string `json:"ID"`
-			DataAssetID string `json:"DataAssetID"`
-			CurrencyID  string `json:"CurrencyID"`
-			Items       []struct {
-				Item struct {
-					ItemTypeID string `json:"ItemTypeID"`
-					ItemID     string `json:"ItemID"`
-					Amount     int    `json:"Amount"`
-				} `json:"Item"`
-				BasePrice       int    `json:"BasePrice"`
-				CurrencyID      string `json:"CurrencyID"`
-				DiscountPercent int    `json:"DiscountPercent"`
-				DiscountedPrice int    `json:"DiscountedPrice"`
-				IsPromoItem     bool   `json:"IsPromoItem"`
-			} `json:"Items"`
-			DurationRemainingInSeconds int  `json:"DurationRemainingInSeconds"`
-			WholesaleOnly              bool `json:"WholesaleOnly"`
-		} `json:"Bundle"`
-		Bundles []struct {
-			ID          string `json:"ID"`
-			DataAssetID string `json:"DataAssetID"`
-			CurrencyID  string `json:"CurrencyID"`
-			Items       []struct {
-				Item struct {
-					ItemTypeID string `json:"ItemTypeID"`
-					ItemID     string `json:"ItemID"`
-					Amount     int    `json:"Amount"`
-				} `json:"Item"`
-				BasePrice       int    `json:"BasePrice"`
-				CurrencyID      string `json:"CurrencyID"`
-				DiscountPercent int    `json:"DiscountPercent"`
-				DiscountedPrice int    `json:"DiscountedPrice"`
-				IsPromoItem     bool   `json:"IsPromoItem"`
-			} `json:"Items"`
-			DurationRemainingInSeconds int  `json:"DurationRemainingInSeconds"`
-			WholesaleOnly              bool `json:"WholesaleOnly"`
-		} `json:"Bundles"`
-		BundleRemainingDurationInSeconds int `json:"BundleRemainingDurationInSeconds"`
-	} `json:"FeaturedBundle"`
 	SkinsPanelLayout struct {
 		SingleItemOffers                           []string `json:"SingleItemOffers"`
 		SingleItemOffersRemainingDurationInSeconds int      `json:"SingleItemOffersRemainingDurationInSeconds"`
 	} `json:"SkinsPanelLayout"`
 }
 
-type SkinDataResponse struct { 
+type SkinDataResponse struct {
 	Data struct {
-		Uuid string `json:"uuid"`
+		Uuid        string `json:"uuid"`
 		DisplayName string `json:"displayName"`
 	} `json:"data"`
+}
+
+type SkinLayout struct {
+	Label *walk.Label
+	Image *walk.ImageView
+}
+
+func (skinLayout *SkinLayout) setData(skinName string, skinImage string) {
+	skinLayout.Label.SetText(skinName)
+	// skinLayout.Image.SetImage(walk.Image{walk.NewBitmap(skinImage)})
+}
+
+func createAllCompositesForSkins(skinLayouts *[]SkinLayout) []Widget {
+	*skinLayouts = make([]SkinLayout, 4)
+	var composites []Widget
+	for _, skinLayout := range *skinLayouts {
+		composites = append(composites, Composite{
+			Layout: VBox{},
+			Children: []Widget{
+				Label{
+					AssignTo: &skinLayout.Label,
+					Text: "",
+				},
+				// ImageView{
+				// 	AssignTo: &skinLayout.Image,
+				// 	Image: "",
+				// },
+			},
+		})
+	}
+	return composites
 }
 
 func (urlVar *ParsedURL) UnmarshalJSON(data []byte) error {
@@ -161,7 +151,6 @@ func loadSavedUser() (User, error) {
 			fmt.Println(err)
 		}
 		s := strings.Split(string(blob), "\x00")
-
 		user = User{cred.UserName, s[0], s[1]}
 	}
 	return user, err
@@ -279,7 +268,7 @@ func getAccessToken() (string, error) {
 	} else if accessTokenContainer.Type == "multifactor" {
 		var mfaResponse MFAResponse
 		json.Unmarshal(data, &mfaResponse)
-		accessToken = MFAModal(userForm, mfaResponse.Multifactor.MultiFactorCodeLength)
+		accessToken = mfaModal(userForm, mfaResponse.Multifactor.MultiFactorCodeLength)
 	} else {
 		return "", errors.New(accessTokenContainer.Type)
 	}
@@ -292,7 +281,7 @@ func setRequestHeaders(req *http.Request) *http.Request {
 	return req
 }
 
-func MFAModal(owner walk.Form, codeLength int) string {
+func mfaModal(owner walk.Form, codeLength int) string {
 	var outLECode *walk.LineEdit
 	var accessToken string
 	Dialog{
@@ -369,28 +358,36 @@ func fetchSkinsWithToken(accessToken string) ([]Skin, error) {
 	if err != nil {
 		walk.MsgBox(nil, "Error", "Couldn't fetch store information", walk.MsgBoxIconError)
 	}
+	skinsInShop, err := getSkinsInShop(shop, accessToken, entitlementResponse.EntitlementsToken)
+	if err != nil {
+		walk.MsgBox(nil, "Error", "Couldn't fetch skins", walk.MsgBoxIconError)
+	}
+	return skinsInShop, nil
+}
+
+func getSkinsInShop(shop Shop, accessToken string, entitlementsToken string) ([]Skin, error) {
 	var skinsInShopIds []string
 	var skinsInShop []Skin
 	for _, tmpSkin := range shop.SkinsPanelLayout.SingleItemOffers {
-		req, _ = http.NewRequest("GET", "https://valorant-api.com/v1/weapons/skinlevels/"+ tmpSkin, nil)
+		req, _ := http.NewRequest("GET", "https://valorant-api.com/v1/weapons/skins/"+tmpSkin, nil)
 		req.Header.Set("Authorization", "Bearer "+accessToken)
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Riot-Entitlements-JWT", entitlementResponse.EntitlementsToken)
-		res, err = client.Do(req)
+		req.Header.Set("X-Riot-Entitlements-JWT", entitlementsToken)
+		res, err := client.Do(req)
 		if err != nil {
-			walk.MsgBox(nil, "Error", "Couldn't fetch account information", walk.MsgBoxIconError)
+			return nil, err
 		}
 		defer res.Body.Close()
 		var skinDataResponse SkinDataResponse
 		err = json.NewDecoder(res.Body).Decode(&skinDataResponse)
 		if err != nil {
-			walk.MsgBox(nil, "Error", "Couldn't fetch skins' ids", walk.MsgBoxIconError)
+			return nil, err
 		}
-		skinsInShopIds = append(skinsInShopIds, skinDataResponse.Data.DisplayName)
+		skinsInShopIds = append(skinsInShopIds, strings.ToUpper(skinDataResponse.Data.Uuid))
 	}
 	for _, skin := range globalStore.Ui.skinsListBox.AllSkins {
 		for _, skinId := range skinsInShopIds {
-			if skinId == skin.Name {
+			if skinId == skin.Id {
 				skinsInShop = append(skinsInShop, skin)
 			}
 		}

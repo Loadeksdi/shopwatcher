@@ -5,14 +5,18 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
+	"path/filepath"
 	"sort"
 
 	lang "github.com/cloudfoundry-attic/jibber_jabber"
+	"github.com/emersion/go-autostart"
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
+	"github.com/robfig/cron"
 )
 
 type SortedSkins []Skin
@@ -35,7 +39,7 @@ func (s SortedSkins) Less(i, j int) bool {
 }
 
 type Response struct {
-	Skins SortedSkins
+	Skins SortedSkins `json:"skins"`
 }
 
 type Skin struct {
@@ -51,6 +55,8 @@ type UiElems struct {
 	selectedSkinsListBox MultiSelectList
 	shop                 *walk.Composite
 	mainWindow           *walk.MainWindow
+	skinLayouts          []SkinLayout
+	notifyIcon           *walk.NotifyIcon
 }
 
 type GlobalStore struct {
@@ -161,21 +167,74 @@ func seedUser() {
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not fetch skins", walk.MsgBoxIconError)
 	}
+	/**
+	for index, skinLayout := range globalStore.Ui.skinLayouts {
+		skinInShop := globalStore.CurrentShop[index]
+		skinLayout.setData(skinInShop.LocalizedNames[locale], skinInShop.AssetPath)
+	}*/
+}
+
+func notifyUserIfTheyHaveWantedSkins(notifyIcon *walk.NotifyIcon) {
+	for _, skin := range globalStore.Ui.selectedSkinsListBox.AllSkins {
+		for _, storeSkin := range globalStore.CurrentShop {
+			if skin.Id == storeSkin.Id {
+				notifyIcon.ShowInfo("Valorant Shopwatcher", skin.LocalizedNames[locale]+" is available in your Valorant shop!")
+			}
+		}
+	}
 }
 
 //go:generate go-winres make --product-version=dev
 
-func main() {
-	var db *walk.DataBinder
-	var err error
-	locale, err = lang.DetectIETF()
+func createNotifyIcon() {
+	ni, err := walk.NewNotifyIcon(globalStore.Ui.mainWindow)
 	if err != nil {
+		log.Fatal(err)
+	}
+	ni.SetToolTip("Valorant Shopwatcher - Currently running")
+	ni.MouseDown().Attach(func(x, y int, button walk.MouseButton) {
+		if button != walk.LeftButton {
+			return
+		}
+
+	})
+	exitAction := walk.NewAction()
+	if err := exitAction.SetText("Exit"); err != nil {
+		log.Fatal(err)
+	}
+	exitAction.Triggered().Attach(func() { walk.App().Exit(0) })
+	if err := ni.ContextMenu().Actions().Add(exitAction); err != nil {
+		log.Fatal(err)
+	}
+	if err := ni.SetVisible(true); err != nil {
+		log.Fatal(err)
+	}
+	globalStore.Ui.notifyIcon = ni
+}
+
+func main() {
+	var appExec string
+	var err error
+	if appExec, err = os.Executable(); err != nil {
+		log.Fatal(err)
+	}
+	var appExecResolved string
+	if appExecResolved, err = filepath.EvalSymlinks(appExec); err != nil {
+		log.Fatal(err)
+	}
+	app := &autostart.App{
+		Name: "Valorant Shopwatcher",
+		DisplayName: "Valorant Shopwatcher",
+		Exec: []string{appExecResolved},
+	}
+	if err := app.Enable(); err != nil {
+		log.Fatal(err)
+	}
+	if locale, err = lang.DetectIETF(); err != nil {
 		locale = "en-US"
 	}
 	globalStore.User, _ = loadSavedUser()
-
 	loadSavedSkins()
-	globalStore.CurrentShop = []Skin{{}, {}, {}, {}}
 	MainWindow{
 		AssignTo: &globalStore.Ui.mainWindow,
 		Title:    "Valorant Shopwatcher",
@@ -205,9 +264,10 @@ func main() {
 							PushButton{
 								Text: ">>",
 								OnClicked: func() {
-									globalStore.Ui.selectedSkinsListBox.FeedList(append(globalStore.Ui.selectedSkinsListBox.AllSkins, globalStore.Ui.skinsListBox.SelectedSkins...))
+									globalStore.Ui.selectedSkinsListBox.InsertSelectedSkins(globalStore.Ui.skinsListBox.SelectedSkins)
 									globalStore.Ui.skinsListBox.SetSelectedIndexes([]int{})
 									saveSkinsData()
+									notifyUserIfTheyHaveWantedSkins(globalStore.Ui.notifyIcon)
 								},
 							},
 							PushButton{
@@ -246,61 +306,17 @@ func main() {
 			Composite{
 				AssignTo: &globalStore.Ui.shop,
 				Layout:   HBox{},
-				Children: []Widget{
-					Composite{
-						DataBinder: DataBinder{
-							AssignTo:       &db,
-							DataSource:     globalStore.CurrentShop[0],
-							ErrorPresenter: ToolTipErrorPresenter{},
-						},
-						Layout: VBox{},
-						Children: []Widget{
-							ImageView{
-								Image: nil,
-							},
-							LineEdit{
-								Text: Bind("Name"),
-							},
-						},
-					},
-					Composite{
-						Layout: VBox{},
-						Children: []Widget{
-							ImageView{
-								Image: nil,
-							},
-							Label{
-								Name: "Skin2",
-							},
-						},
-					},
-					Composite{
-						Layout: VBox{},
-						Children: []Widget{
-							ImageView{
-								Image: nil,
-							},
-							Label{
-								Name: "Skin3",
-							},
-						},
-					},
-					Composite{
-						Layout: VBox{},
-						Children: []Widget{
-							ImageView{
-								Image: nil,
-							},
-							Label{
-								Name: "Skin4",
-							},
-						},
-					},
-				},
+				Children: createAllCompositesForSkins(&globalStore.Ui.skinLayouts),
 			},
 		},
 	}.Create()
+	createNotifyIcon()
 	go seedUser()
 	go feedData()
 	globalStore.Ui.mainWindow.Run()
+	c := cron.New()
+	c.AddFunc("0 0 2 ? * *", func() {
+		seedUser()
+		notifyUserIfTheyHaveWantedSkins(globalStore.Ui.notifyIcon)
+	})
 }
