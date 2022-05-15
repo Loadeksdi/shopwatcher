@@ -1,16 +1,13 @@
 package main
 
 import (
-	"crypto/tls"
-	"encoding/base64"
+	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
-	"net/http/cookiejar"
 	"os"
 	"path/filepath"
-	"sort"
 
 	lang "github.com/cloudfoundry-attic/jibber_jabber"
 	"github.com/emersion/go-autostart"
@@ -19,172 +16,9 @@ import (
 	"github.com/robfig/cron"
 )
 
-type SortedSkins []Skin
-
-func (s SortedSkins) Len() int {
-	return len(s)
-}
-
-func (s SortedSkins) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s SortedSkins) Less(i, j int) bool {
-	if _, ok := s[i].LocalizedNames[locale]; !ok {
-		locale = "en-US"
-	}
-	localizedSlice := []string{s[i].LocalizedNames[locale], s[j].LocalizedNames[locale]}
-	sort.Strings(localizedSlice)
-	return localizedSlice[0] == s[i].LocalizedNames[locale]
-}
-
-type Response struct {
-	Skins SortedSkins `json:"skins"`
-}
-
-type Skin struct {
-	Name           string
-	LocalizedNames map[string]string
-	Id             string
-	AssetName      string
-	AssetPath      string
-}
-
-type UiElems struct {
-	skinsListBox         MultiSelectList
-	selectedSkinsListBox MultiSelectList
-	shop                 *walk.Composite
-	mainWindow           *walk.MainWindow
-	skinLayouts          []SkinLayout
-	notifyIcon           *walk.NotifyIcon
-}
-
-type GlobalStore struct {
-	Ui          UiElems
-	CurrentShop []Skin
-	User        User
-}
-
 var globalStore = GlobalStore{}
-var cj, _ = cookiejar.New(nil)
-var defaultTransport = http.DefaultTransport.(*http.Transport)
-var customTransport = &http.Transport{
-	Proxy:                 defaultTransport.Proxy,
-	DialContext:           defaultTransport.DialContext,
-	MaxIdleConns:          defaultTransport.MaxIdleConns,
-	IdleConnTimeout:       defaultTransport.IdleConnTimeout,
-	ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
-	TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
-	TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS12, PreferServerCipherSuites: false,
-		CipherSuites: []uint16{
-			tls.TLS_CHACHA20_POLY1305_SHA256,
-			tls.TLS_AES_128_GCM_SHA256,
-			tls.TLS_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_RSA_WITH_AES_128_CBC_SHA,
-			tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-		}},
-}
-var client = &http.Client{Jar: cj, Transport: customTransport}
-
 var locale string
-
-func fetchSkins() ([]Skin, error) {
-	req, _ := http.NewRequest("GET", "https://eu.api.riotgames.com/val/content/v1/contents?locale="+locale, nil)
-	apiKey, err := base64.StdEncoding.DecodeString("UkdBUEktMmNiYTdjOGQtZWFlMy00ZTk0LThlY2EtMGRkOWU0MzhiZmI0")
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("X-Riot-Token", string(apiKey))
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	var response Response
-	err = json.NewDecoder(res.Body).Decode(&response)
-	if err != nil {
-		return nil, err
-	}
-	for _, skin := range response.Skins {
-		skin.AssetPath = "https://github.com/InFinity54/Valorant_DDragon/blob/master/WeaponSkins/" + skin.Id + ".png"
-	}
-	return response.Skins, nil
-}
-
-func loadSavedSkins() {
-	file, _ := os.ReadFile("saves/skins.json")
-	var savedSkins SortedSkins
-	err := json.Unmarshal(file, &savedSkins)
-	if err != nil {
-		walk.MsgBox(nil, "Error", "The app could not load saved skins", walk.MsgBoxIconError)
-	}
-	globalStore.Ui.selectedSkinsListBox.AllSkins = savedSkins
-}
-
-func feedData() {
-	res, err := fetchSkins()
-	if err != nil {
-		walk.MsgBox(nil, "Error", "The app could not fetch skins", walk.MsgBoxIconError)
-	}
-	globalStore.Ui.skinsListBox.FeedList(res)
-}
-
-func saveSkinsData() {
-	json, err := json.MarshalIndent(globalStore.Ui.selectedSkinsListBox.AllSkins, "", "  ")
-	if err != nil {
-		walk.MsgBox(nil, "Error", "The app could not save the data", walk.MsgBoxIconError)
-	}
-	if _, err := os.Stat("saves"); os.IsNotExist(err) {
-		os.Mkdir("saves", 0777)
-	}
-	err = ioutil.WriteFile("saves/skins.json", json, 0644)
-	if err != nil {
-		walk.MsgBox(nil, "Error", "The app could not save the data", walk.MsgBoxIconError)
-	}
-}
-
-func seedUser() {
-	if globalStore.User.Login == "" {
-		drawUserform(globalStore.Ui.mainWindow)
-	}
-	accessToken, err := getAccessToken()
-	if err != nil {
-		walk.MsgBox(nil, "Error", "The app could not call Riot servers", walk.MsgBoxIconError)
-	}
-	globalStore.CurrentShop, err = fetchSkinsWithToken(accessToken)
-	if err != nil {
-		walk.MsgBox(nil, "Error", "The app could not fetch skins", walk.MsgBoxIconError)
-	}
-	/**
-	for index, skinLayout := range globalStore.Ui.skinLayouts {
-		skinInShop := globalStore.CurrentShop[index]
-		skinLayout.setData(skinInShop.LocalizedNames[locale], skinInShop.AssetPath)
-	}*/
-}
-
-func notifyUserIfTheyHaveWantedSkins(notifyIcon *walk.NotifyIcon) {
-	for _, skin := range globalStore.Ui.selectedSkinsListBox.AllSkins {
-		for _, storeSkin := range globalStore.CurrentShop {
-			if skin.Id == storeSkin.Id {
-				notifyIcon.ShowInfo("Valorant Shopwatcher", skin.LocalizedNames[locale]+" is available in your Valorant shop!")
-			}
-		}
-	}
-}
-
-//go:generate go-winres make --product-version=dev
+var userForm *walk.Dialog
 
 func createNotifyIcon() {
 	ni, err := walk.NewNotifyIcon(globalStore.Ui.mainWindow)
@@ -212,6 +46,146 @@ func createNotifyIcon() {
 	globalStore.Ui.notifyIcon = ni
 }
 
+func createAllCompositesForSkins(skinLayouts *[]SkinLayout) []Widget {
+	*skinLayouts = make([]SkinLayout, 4)
+	var composites []Widget
+	for _, skinLayout := range *skinLayouts {
+		composites = append(composites, Composite{
+			Layout: VBox{},
+			Children: []Widget{
+				Label{
+					AssignTo: &skinLayout.Label,
+					Text: "",
+				},
+				// ImageView{
+				// 	AssignTo: &skinLayout.Image,
+				// 	Image: "",
+				// },
+			},
+		})
+	}
+	return composites
+}
+
+func notifyUserIfTheyHaveWantedSkins(notifyIcon *walk.NotifyIcon) {
+	for _, skin := range globalStore.Ui.selectedSkinsListBox.AllSkins {
+		for _, storeSkin := range globalStore.CurrentShop {
+			if skin.Id == storeSkin.Id {
+				notifyIcon.ShowInfo("Valorant Shopwatcher", skin.LocalizedNames[locale]+" is available in your Valorant shop!")
+			}
+		}
+	}
+}
+
+func drawUserform(owner walk.Form) {
+	var outLELogin *walk.LineEdit
+	var outLEPassword *walk.LineEdit
+	var outCBRegion *walk.ComboBox
+	Dialog{
+		AssignTo: &userForm,
+		Title:    "Login",
+		MinSize:  Size{Width: 200, Height: 250},
+		Layout:   VBox{},
+		Children: []Widget{
+			Composite{
+				Layout: HBox{},
+				Children: []Widget{
+					Label{
+						Text: "Username:",
+					},
+					LineEdit{
+						Name:     "Username",
+						AssignTo: &outLELogin,
+					},
+				},
+			},
+			Composite{
+				Layout: HBox{},
+				Children: []Widget{
+					Label{
+						Text: "Password:",
+					},
+					LineEdit{
+						Name:         "Password",
+						AssignTo:     &outLEPassword,
+						PasswordMode: true,
+					},
+				},
+			},
+			Composite{
+				Layout: HBox{},
+				Children: []Widget{
+					Label{
+						Text: "Region:",
+					},
+					ComboBox{
+						Name:     "Region",
+						AssignTo: &outCBRegion,
+						Model:    []string{"AP", "BR", "ESPORTS", "EU", "KR", "LATAM", "NA"},
+					},
+				},
+			},
+			PushButton{
+				Text: "Log in",
+				OnClicked: func() {
+					globalStore.User = User{Login: outLELogin.Text(), Password: outLEPassword.Text(), Region: outCBRegion.Text()}
+					accessToken, err := getAccessToken()
+					if err != nil {
+						walk.MsgBox(nil, "Error", "Invalid credentials", walk.MsgBoxIconError)
+						return
+					}
+					saveUserData(globalStore.User)
+					globalStore.CurrentShop, _ = fetchSkinsWithToken(accessToken)
+					userForm.Close(0)
+				},
+			},
+		},
+	}.Run(owner)
+}
+
+func drawMfaModal(owner walk.Form, codeLength int) string {
+	var outLECode *walk.LineEdit
+	var accessToken string
+	Dialog{
+		Title:   "Multi-factor authentication enabled",
+		MinSize: Size{Width: 200, Height: 250},
+		Layout:  VBox{},
+		Children: []Widget{
+			Label{
+				Text: "Please enter MFA code given by Riot Games",
+			},
+			LineEdit{
+				AssignTo:  &outLECode,
+				Name:      "MFA code",
+				MaxLength: codeLength,
+			},
+			PushButton{
+				Text: "Submit code",
+				OnClicked: func() {
+					body, _ := json.Marshal(MFABody{Type: "multifactor", Code: outLECode.Text(), RememberDevice: false})
+					req, _ := http.NewRequest("PUT", "https://auth.riotgames.com/api/v1/authorization", bytes.NewBuffer(body))
+					setRequestHeaders(req)
+					res, err := client.Do(req)
+					if err != nil {
+						walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
+					}
+					defer res.Body.Close()
+					var accessTokenContainer AccessTokenContainer
+					data, _ := io.ReadAll(res.Body)
+					err = json.Unmarshal(data, &accessTokenContainer)
+					if err != nil {
+						walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
+					}
+					accessToken = accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
+				},
+			},
+		},
+	}.Run(owner)
+	return accessToken
+}
+
+//go:generate go-winres make --product-version=dev
+
 func main() {
 	var appExec string
 	var err error
@@ -223,9 +197,9 @@ func main() {
 		log.Fatal(err)
 	}
 	app := &autostart.App{
-		Name: "Valorant Shopwatcher",
+		Name:        "Valorant Shopwatcher",
 		DisplayName: "Valorant Shopwatcher",
-		Exec: []string{appExecResolved},
+		Exec:        []string{appExecResolved},
 	}
 	if err := app.Enable(); err != nil {
 		log.Fatal(err)
