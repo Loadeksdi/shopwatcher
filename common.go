@@ -90,7 +90,6 @@ type SkinDataResponse struct {
 
 type SkinLayout struct {
 	Label *walk.Label
-	Image *walk.ImageView
 }
 
 type UiElems struct {

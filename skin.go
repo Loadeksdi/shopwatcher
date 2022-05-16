@@ -63,9 +63,6 @@ func fetchSkins() ([]Skin, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, skin := range response.Skins {
-		skin.AssetPath = "https://github.com/InFinity54/Valorant_DDragon/blob/master/WeaponSkins/" + skin.Id + ".png"
-	}
 	return response.Skins, nil
 }
 

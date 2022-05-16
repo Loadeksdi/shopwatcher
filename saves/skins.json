@@ -26,6 +26,32 @@
     "AssetPath": ""
   },
   {
+    "Name": "Outpost Ares",
+    "LocalizedNames": {
+      "ar-AE": "آوت بوست آريز",
+      "de-DE": "Ares – Outpost",
+      "en-US": "Outpost Ares",
+      "es-ES": "Ares Outpost",
+      "es-MX": "Ares Industrial",
+      "fr-FR": "Ares (Avant-poste)",
+      "id-ID": "Outpost Ares",
+      "it-IT": "Ares Avamposto",
+      "ja-JP": "アウトポスト アレス",
+      "ko-KR": "아웃포스트 아레스",
+      "pl-PL": "Ares Posterunkowy",
+      "pt-BR": "Ares Posto Avançado",
+      "ru-RU": "Ares \"Аванпост\"",
+      "th-TH": "Outpost Ares",
+      "tr-TR": "KARAKOL ARES",
+      "vi-VN": "Ares Tiền Đồn",
+      "zh-CN": "战火前哨 战神",
+      "zh-TW": "鐵色工哨 戰神"
+    },
+    "Id": "4308FE43-44C1-9FE8-D5F9-95BE2BC70D51",
+    "AssetName": "Default__LMG_Industrial_PrimaryAsset_C",
+    "AssetPath": ""
+  },
+  {
     "Name": "Surge Classic",
     "LocalizedNames": {
       "ar-AE": "سيرج كلاسيك",

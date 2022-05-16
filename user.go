@@ -15,9 +15,8 @@ import (
 	"github.com/lxn/walk"
 )
 
-func (skinLayout *SkinLayout) setData(skinName string, skinImage string) {
+func (skinLayout *SkinLayout) setData(skinName string) {
 	skinLayout.Label.SetText(skinName)
-	// skinLayout.Image.SetImage(walk.Image{walk.NewBitmap(skinImage)})
 }
 
 func loadSavedUser() (User, error) {

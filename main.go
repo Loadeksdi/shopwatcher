@@ -56,11 +56,7 @@ func createAllCompositesForSkins(skinLayouts *[]SkinLayout) []Widget {
 				Label{
 					AssignTo: &skinLayout.Label,
 					Text: "",
-				},
-				// ImageView{
-				// 	AssignTo: &skinLayout.Image,
-				// 	Image: "",
-				// },
+				}
 			},
 		})
 	}
