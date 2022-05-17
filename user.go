@@ -78,7 +78,7 @@ func getAccessToken() (string, error) {
 	} else if accessTokenContainer.Type == "multifactor" {
 		var mfaResponse MFAResponse
 		json.Unmarshal(data, &mfaResponse)
-		accessToken = drawMfaModal(userForm, mfaResponse.Multifactor.MultiFactorCodeLength)
+		accessToken = drawMfaModal(globalStore.Ui.mainWindow, mfaResponse.Multifactor.MultiFactorCodeLength)
 	} else {
 		return "", errors.New(accessTokenContainer.Type)
 	}
@@ -86,10 +86,13 @@ func getAccessToken() (string, error) {
 }
 
 func seedUser() {
+	var accessToken string
+	var err error
 	if globalStore.User.Login == "" {
-		drawUserform(globalStore.Ui.mainWindow)
+		accessToken = drawUserform(globalStore.Ui.mainWindow)
+	} else {
+		accessToken, err = getAccessToken()
 	}
-	accessToken, err := getAccessToken()
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not call Riot servers", walk.MsgBoxIconError)
 	}
@@ -97,4 +100,5 @@ func seedUser() {
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not fetch skins", walk.MsgBoxIconError)
 	}
+	drawShop()
 }

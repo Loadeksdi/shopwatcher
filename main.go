@@ -18,7 +18,6 @@ import (
 
 var globalStore = GlobalStore{}
 var locale string
-var userForm *walk.Dialog
 
 func createNotifyIcon() {
 	ni, err := walk.NewNotifyIcon(globalStore.Ui.mainWindow)
@@ -73,7 +72,9 @@ func notifyUserIfTheyHaveWantedSkins(notifyIcon *walk.NotifyIcon) {
 	}
 }
 
-func drawUserform(owner walk.Form) {
+func drawUserform(owner walk.Form) string {
+	var accessToken string
+	var userForm *walk.Dialog
 	var outLELogin *walk.LineEdit
 	var outLEPassword *walk.LineEdit
 	var outCBRegion *walk.ComboBox
@@ -125,24 +126,34 @@ func drawUserform(owner walk.Form) {
 				Text: "Log in",
 				OnClicked: func() {
 					globalStore.User = User{Login: outLELogin.Text(), Password: outLEPassword.Text(), Region: outCBRegion.Text()}
-					accessToken, err := getAccessToken()
+					var err error
+					accessToken, err = getAccessToken()
 					if err != nil {
 						walk.MsgBox(nil, "Error", "Invalid credentials", walk.MsgBoxIconError)
+						userForm.Run()
 						return
 					}
 					saveUserData(globalStore.User)
-					globalStore.CurrentShop, _ = fetchSkinsWithToken(accessToken)
 					userForm.Close(0)
 				},
 			},
 		},
 	}.Run(owner)
+	return accessToken
+}
+
+func drawShop(){
+	for index, skinLayout := range globalStore.Ui.skinLayouts {
+		skinLayout.setData(globalStore.CurrentShop[index].LocalizedNames[locale])
+	}
 }
 
 func drawMfaModal(owner walk.Form, codeLength int) string {
 	var outLECode *walk.LineEdit
 	var accessToken string
+	var mfa *walk.Dialog
 	Dialog{
+		AssignTo: &mfa,
 		Title:   "Multi-factor authentication enabled",
 		MinSize: Size{Width: 200, Height: 250},
 		Layout:  VBox{},
@@ -173,6 +184,7 @@ func drawMfaModal(owner walk.Form, codeLength int) string {
 						walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
 					}
 					accessToken = accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
+					mfa.Close(0)
 				},
 			},
 		},
@@ -257,10 +269,9 @@ func main() {
 						Layout: VBox{},
 						Children: []Widget{
 							Label{
-								Text: "My watchlist",
+								Text: "My wishlist",
 							},
 							ListBox{
-								Name:                     "My watchlist",
 								MultiSelection:           true,
 								Model:                    &globalStore.Ui.selectedSkinsListBox,
 								AssignTo:                 &globalStore.Ui.selectedSkinsListBox.ListBox,

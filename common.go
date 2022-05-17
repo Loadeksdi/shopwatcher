@@ -158,4 +158,3 @@ func (urlVar *ParsedURL) UnmarshalJSON(data []byte) error {
 	urlVar.URL = parsedUrl
 	return nil
 }
-
