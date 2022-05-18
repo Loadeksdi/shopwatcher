@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -300,8 +301,10 @@ func main() {
 	go feedData()
 	globalStore.Ui.mainWindow.Run()
 	c := cron.New()
-	c.AddFunc("0 0 2 ? * *", func() {
+	c.AddFunc("0 50 18 ? * *", func() {
+		fmt.Println("works")
 		seedUser()
 		notifyUserIfTheyHaveWantedSkins(globalStore.Ui.notifyIcon)
 	})
+	c.Start()
 }
