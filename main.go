@@ -123,7 +123,7 @@ func drawUserform(owner walk.Form) string {
 					ComboBox{
 						Name:     "Region",
 						AssignTo: &outCBRegion,
-						Model:    []string{"AP", "BR", "ESPORTS", "EU", "KR", "LATAM", "NA"},
+						Model:    []string{"AP", "EU", "KR", "NA"},
 					},
 				},
 			},
