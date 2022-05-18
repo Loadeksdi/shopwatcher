@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	lang "github.com/cloudfoundry-attic/jibber_jabber"
@@ -48,13 +49,16 @@ func createNotifyIcon() {
 func createAllCompositesForSkins(skinLayouts *[]SkinLayout) []Widget {
 	*skinLayouts = make([]SkinLayout, 4)
 	var composites []Widget
-	for _, skinLayout := range *skinLayouts {
+	for i := 0; i < len(*skinLayouts); i++ {
 		composites = append(composites, Composite{
 			Layout: VBox{},
 			Children: []Widget{
-				Label{
-					AssignTo: &skinLayout.Label,
-					Text: "",
+				LinkLabel{
+					AssignTo: &(*skinLayouts)[i].LinkLabel,
+					Text:     "",
+					OnLinkActivated: func(link *walk.LinkLabelLink) {
+						exec.Command("explorer", link.URL()).Start()
+					},
 				},
 			},
 		})
@@ -142,9 +146,9 @@ func drawUserform(owner walk.Form) string {
 	return accessToken
 }
 
-func drawShop(){
+func drawShop() {
 	for index, skinLayout := range globalStore.Ui.skinLayouts {
-		skinLayout.setData(globalStore.CurrentShop[index].LocalizedNames[locale])
+		skinLayout.setData(globalStore.CurrentShop[index].LocalizedNames[locale], globalStore.CurrentShop[index].Video)
 	}
 }
 
@@ -154,9 +158,9 @@ func drawMfaModal(owner walk.Form, codeLength int) string {
 	var mfa *walk.Dialog
 	Dialog{
 		AssignTo: &mfa,
-		Title:   "Multi-factor authentication enabled",
-		MinSize: Size{Width: 200, Height: 250},
-		Layout:  VBox{},
+		Title:    "Multi-factor authentication enabled",
+		MinSize:  Size{Width: 200, Height: 250},
+		Layout:   VBox{},
 		Children: []Widget{
 			Label{
 				Text: "Please enter MFA code given by Riot Games",

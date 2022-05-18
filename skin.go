@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
-	"strings"
 
 	"github.com/lxn/walk"
 )
@@ -99,10 +98,10 @@ func saveSkinsData() {
 }
 
 func getSkinsInShop(shop Shop, accessToken string, entitlementsToken string) ([]Skin, error) {
-	var skinsInShopIds []string
+	var skinsInShopNameVideos []SkinNameVideo
 	var skinsInShop []Skin
 	for _, tmpSkin := range shop.SkinsPanelLayout.SingleItemOffers {
-		req, _ := http.NewRequest("GET", "https://valorant-api.com/v1/weapons/skins/"+tmpSkin, nil)
+		req, _ := http.NewRequest("GET", "https://valorant-api.com/v1/weapons/skinlevels/"+tmpSkin, nil)
 		req.Header.Set("Authorization", "Bearer "+accessToken)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Riot-Entitlements-JWT", entitlementsToken)
@@ -116,11 +115,12 @@ func getSkinsInShop(shop Shop, accessToken string, entitlementsToken string) ([]
 		if err != nil {
 			return nil, err
 		}
-		skinsInShopIds = append(skinsInShopIds, strings.ToUpper(skinDataResponse.Data.Uuid))
+		skinsInShopNameVideos = append(skinsInShopNameVideos, SkinNameVideo{Name: skinDataResponse.Data.DisplayName, Video: skinDataResponse.Data.StreamedVideo})
 	}
 	for _, skin := range globalStore.Ui.skinsListBox.AllSkins {
-		for _, skinId := range skinsInShopIds {
-			if skinId == skin.Id {
+		for _, skinObject := range skinsInShopNameVideos {
+			if skinObject.Name == skin.Name {
+				skin.Video = skinObject.Video
 				skinsInShop = append(skinsInShop, skin)
 			}
 		}
@@ -170,4 +170,3 @@ func fetchSkinsWithToken(accessToken string) ([]Skin, error) {
 	}
 	return skinsInShop, nil
 }
-

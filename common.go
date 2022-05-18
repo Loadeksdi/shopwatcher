@@ -83,13 +83,14 @@ type Shop struct {
 
 type SkinDataResponse struct {
 	Data struct {
-		Uuid        string `json:"uuid"`
-		DisplayName string `json:"displayName"`
+		Uuid          string `json:"uuid"`
+		DisplayName   string `json:"displayName"`
+		StreamedVideo string `json:"streamedVideo"`
 	} `json:"data"`
 }
 
 type SkinLayout struct {
-	Label *walk.Label
+	LinkLabel *walk.LinkLabel
 }
 
 type UiElems struct {
@@ -102,9 +103,9 @@ type UiElems struct {
 }
 
 type GlobalStore struct {
-	Ui          UiElems
-	CurrentShop []Skin
-	User        User
+	Ui            UiElems
+	CurrentShop   []Skin
+	User          User
 }
 
 type Response struct {
@@ -117,9 +118,15 @@ type Skin struct {
 	Id             string
 	AssetName      string
 	AssetPath      string
+	Video          string
 }
 
 type SortedSkins []Skin
+
+type SkinNameVideo struct {
+	Name  string
+	Video string
+}
 
 func (s SortedSkins) Len() int {
 	return len(s)

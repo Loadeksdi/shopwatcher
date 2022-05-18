@@ -15,8 +15,12 @@ import (
 	"github.com/lxn/walk"
 )
 
-func (skinLayout *SkinLayout) setData(skinName string) {
-	skinLayout.Label.SetText(skinName)
+func (skinLayout *SkinLayout) setData(skinName string, skinUrl string) {
+	if skinUrl != "" {
+		skinLayout.LinkLabel.SetText("<a href=\"" + skinUrl + "\">" + skinName + "</a>")
+	} else {
+		skinLayout.LinkLabel.SetText(skinName)
+	}
 }
 
 func loadSavedUser() (User, error) {
