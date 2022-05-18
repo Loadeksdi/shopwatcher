@@ -197,6 +197,16 @@ func drawMfaModal(owner walk.Form, codeLength int) string {
 	return accessToken
 }
 
+func handleCron() {
+	c := cron.New()
+	c.AddFunc("0 0 2 ? * *", func() {
+		fmt.Println("works")
+		seedUser()
+		notifyUserIfTheyHaveWantedSkins(globalStore.Ui.notifyIcon)
+	})
+	c.Start()
+}
+
 //go:generate go-winres make --product-version=dev
 
 func main() {
@@ -299,12 +309,6 @@ func main() {
 	createNotifyIcon()
 	go seedUser()
 	go feedData()
+	go handleCron()
 	globalStore.Ui.mainWindow.Run()
-	c := cron.New()
-	c.AddFunc("0 50 18 ? * *", func() {
-		fmt.Println("works")
-		seedUser()
-		notifyUserIfTheyHaveWantedSkins(globalStore.Ui.notifyIcon)
-	})
-	c.Start()
 }

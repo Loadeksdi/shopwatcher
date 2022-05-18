@@ -47,7 +47,7 @@ var client = &http.Client{Jar: cj, Transport: customTransport}
 
 func fetchSkins() ([]Skin, error) {
 	req, _ := http.NewRequest("GET", "https://eu.api.riotgames.com/val/content/v1/contents?locale="+locale, nil)
-	apiKey, err := base64.StdEncoding.DecodeString("UkdBUEktYjgzMTk2MDMtYTM2Ny00Y2RhLWE0NDUtYzM3Y2Y4MjFiYmM1")
+	apiKey, err := base64.StdEncoding.DecodeString("UkdBUEktODk1MDYxNTctMWYzNS00MjgzLTg4NDktMWI1ODY2NjE4MzY2")
 	if err != nil {
 		return nil, err
 	}

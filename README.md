@@ -15,4 +15,4 @@ Just run the app, log yourself in **(we do not fetch your credentials as they ar
 Nothing here yet...
 
 ## Disclaimer
-This app is totally unofficial and is not endorsed by Riot Games neither, it is totally possible that it will become unavilable for many reasons due to the dependencies of the app. I do not own any of the content used in the app.
+This app is totally unofficial and is not endorsed by Riot Games neither, it is totally possible that it will become unavailable for many reasons due to the dependencies of the app. I do not own any of the content used in the app.
