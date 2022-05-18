@@ -14,6 +14,7 @@ type User struct {
 	Login    string
 	Password string
 	Region   string
+	AccessToken string
 }
 
 type AuthBody struct {

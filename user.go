@@ -33,7 +33,10 @@ func loadSavedUser() (User, error) {
 			fmt.Println(err)
 		}
 		s := strings.Split(string(blob), "\x00")
-		user = User{cred.UserName, s[0], s[1]}
+		if s[2] == "" {
+			return user, errors.New("No access token")
+		}
+		user = User{cred.UserName, s[0], s[1], s[2]}
 	}
 	return user, err
 }
@@ -44,7 +47,7 @@ func saveUserData(user User) {
 	cred.TargetAlias = "ValorantShopwatcher"
 	cred.TargetName = "ValorantShopwatcher"
 	encoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
-	blob, _ := encoder.Bytes([]byte(user.Password + "\x00" + user.Region))
+	blob, _ := encoder.Bytes([]byte(user.Password + "\x00" + user.Region + "\x00" + user.AccessToken))
 	cred.CredentialBlob = blob
 	cred.UserName = user.Login
 	err := cred.Write()
@@ -100,6 +103,7 @@ func seedUser() {
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not call Riot servers", walk.MsgBoxIconError)
 	}
+	globalStore.User.AccessToken = accessToken
 	globalStore.CurrentShop, err = fetchSkinsWithToken(accessToken)
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not fetch skins", walk.MsgBoxIconError)

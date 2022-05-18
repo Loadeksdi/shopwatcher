@@ -134,7 +134,8 @@ func fetchSkinsWithToken(accessToken string) ([]Skin, error) {
 	req.Header.Set("Content-Type", "application/json")
 	res, err := client.Do(req)
 	if err != nil {
-		walk.MsgBox(nil, "Error", "Couldn't fetch account information", walk.MsgBoxIconError)
+		globalStore.User.AccessToken, _ = getAccessToken()
+		fetchSkinsWithToken(globalStore.User.AccessToken)
 	}
 	defer res.Body.Close()
 	var entitlementResponse EntitlementResponse

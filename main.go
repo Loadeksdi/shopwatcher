@@ -27,6 +27,14 @@ func createNotifyIcon() {
 		log.Fatal(err)
 	}
 	ni.SetToolTip("Valorant Shopwatcher - Currently running")
+	icon, err := walk.Resources.Icon("winres/icon.ico")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = ni.SetIcon(icon)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ni.MouseDown().Attach(func(x, y int, button walk.MouseButton) {
 		if button != walk.LeftButton {
 			return
@@ -133,6 +141,7 @@ func drawUserform(owner walk.Form) string {
 					globalStore.User = User{Login: outLELogin.Text(), Password: outLEPassword.Text(), Region: outCBRegion.Text()}
 					var err error
 					accessToken, err = getAccessToken()
+					globalStore.User.AccessToken = accessToken
 					if err != nil {
 						walk.MsgBox(nil, "Error", "Invalid credentials", walk.MsgBoxIconError)
 						userForm.Run()
