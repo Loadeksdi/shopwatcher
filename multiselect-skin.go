@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/lxn/walk"
@@ -18,12 +19,19 @@ func (m *MultiSelectList) ItemCount() int {
 }
 
 func (m *MultiSelectList) Value(index int) interface{} {
-	var skinName string
+	var skinName any
 	var ok bool
-	if skinName, ok = m.AllSkins[index].LocalizedNames[locale]; !ok {
-		skinName = m.AllSkins[index].LocalizedNames["en-US"]
+	m.AllSkins[index].LocalizedNames.Range(func(key any, value any) bool{
+		fmt.Println(key, value)
+		return true
+	})
+	if skinName, ok = m.AllSkins[index].LocalizedNames.Load(locale); !ok {
+		skinName, _ = m.AllSkins[index].LocalizedNames.Load("en-US")
 	}
-	return skinName
+	if skinName == nil {
+		return nil
+	}
+	return skinName.(string)
 }
 
 func (m *MultiSelectList) FeedList(skins SortedSkins) {

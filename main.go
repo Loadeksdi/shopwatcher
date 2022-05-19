@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -79,86 +78,96 @@ func notifyUserIfTheyHaveWantedSkins(notifyIcon *walk.NotifyIcon) {
 	for _, skin := range globalStore.Ui.selectedSkinsListBox.AllSkins {
 		for _, storeSkin := range globalStore.CurrentShop {
 			if skin.Id == storeSkin.Id {
-				notifyIcon.ShowInfo("Valorant Shopwatcher", skin.LocalizedNames[locale]+" is available in your Valorant shop!")
+				skinLocalizedName, _ := skin.LocalizedNames.Load(locale)
+				notifyIcon.ShowInfo("Valorant Shopwatcher", skinLocalizedName.(string) + " is available in your Valorant shop!")
 			}
 		}
 	}
 }
 
-func drawUserform(owner walk.Form) string {
-	var accessToken string
+func drawUserform(owner walk.Form) {
 	var userForm *walk.Dialog
 	var outLELogin *walk.LineEdit
 	var outLEPassword *walk.LineEdit
 	var outCBRegion *walk.ComboBox
-	Dialog{
-		AssignTo: &userForm,
-		Title:    "Login",
-		MinSize:  Size{Width: 200, Height: 250},
-		Layout:   VBox{},
-		Children: []Widget{
-			Composite{
-				Layout: HBox{},
-				Children: []Widget{
-					Label{
-						Text: "Username:",
+	globalStore.Ui.mainWindow.WindowBase.Synchronize(func(){
+		Dialog{
+			AssignTo: &userForm,
+			Title:    "Login",
+			MinSize:  Size{Width: 200, Height: 250},
+			Layout:   VBox{},
+			Children: []Widget{
+				Composite{
+					Layout: HBox{},
+					Children: []Widget{
+						Label{
+							Text: "Username:",
+						},
+						LineEdit{
+							Name:     "Username",
+							AssignTo: &outLELogin,
+						},
 					},
-					LineEdit{
-						Name:     "Username",
-						AssignTo: &outLELogin,
+				},
+				Composite{
+					Layout: HBox{},
+					Children: []Widget{
+						Label{
+							Text: "Password:",
+						},
+						LineEdit{
+							Name:         "Password",
+							AssignTo:     &outLEPassword,
+							PasswordMode: true,
+						},
+					},
+				},
+				Composite{
+					Layout: HBox{},
+					Children: []Widget{
+						Label{
+							Text: "Region:",
+						},
+						ComboBox{
+							Name:     "Region",
+							AssignTo: &outCBRegion,
+							Model:    []string{"AP", "EU", "KR", "NA"},
+						},
+					},
+				},
+				PushButton{
+					Text: "Log in",
+					OnClicked: func() {
+						globalStore.User = User{Login: outLELogin.Text(), Password: outLEPassword.Text(), Region: outCBRegion.Text()}
+						var err error
+						if err != nil {
+							walk.MsgBox(nil, "Error", "Invalid credentials", walk.MsgBoxIconError)
+							globalStore.Ui.mainWindow.WindowBase.Synchronize(func(){
+								userForm.Run()
+							})
+							return
+						}
+						userForm.Close(-1)
 					},
 				},
 			},
-			Composite{
-				Layout: HBox{},
-				Children: []Widget{
-					Label{
-						Text: "Password:",
-					},
-					LineEdit{
-						Name:         "Password",
-						AssignTo:     &outLEPassword,
-						PasswordMode: true,
-					},
-				},
-			},
-			Composite{
-				Layout: HBox{},
-				Children: []Widget{
-					Label{
-						Text: "Region:",
-					},
-					ComboBox{
-						Name:     "Region",
-						AssignTo: &outCBRegion,
-						Model:    []string{"AP", "EU", "KR", "NA"},
-					},
-				},
-			},
-			PushButton{
-				Text: "Log in",
-				OnClicked: func() {
-					globalStore.User = User{Login: outLELogin.Text(), Password: outLEPassword.Text(), Region: outCBRegion.Text()}
-					var err error
-					accessToken, err = getAccessToken()
-					globalStore.User.AccessToken = accessToken
-					if err != nil {
-						walk.MsgBox(nil, "Error", "Invalid credentials", walk.MsgBoxIconError)
-						userForm.Run()
-						return
-					}
-					saveUserData(globalStore.User)
-					userForm.Close(0)
-				},
-			},
-		},
-	}.Run(owner)
-	return accessToken
+		}.Create(owner)
+		userForm.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
+			if userForm.Result() != -1 {
+				os.Exit(0)
+			} else {
+				globalStore.Channels.LoginWindow <- true
+				saveUserData(globalStore.User)
+			}
+		})
+		userForm.Run()
+	})
 }
 
 func drawShop() {
 	for index, skinLayout := range globalStore.Ui.skinLayouts {
-		skinLayout.setData(globalStore.CurrentShop[index].LocalizedNames[locale], globalStore.CurrentShop[index].Video)
+		res, _ := globalStore.CurrentShop[index].LocalizedNames.Load(locale)
+		skinLayout.setData(res.(string), globalStore.CurrentShop[index].Video)
 	}
 }
 
@@ -166,50 +175,57 @@ func drawMfaModal(owner walk.Form, codeLength int) string {
 	var outLECode *walk.LineEdit
 	var accessToken string
 	var mfa *walk.Dialog
-	Dialog{
-		AssignTo: &mfa,
-		Title:    "Multi-factor authentication enabled",
-		MinSize:  Size{Width: 200, Height: 250},
-		Layout:   VBox{},
-		Children: []Widget{
-			Label{
-				Text: "Please enter MFA code given by Riot Games",
-			},
-			LineEdit{
-				AssignTo:  &outLECode,
-				Name:      "MFA code",
-				MaxLength: codeLength,
-			},
-			PushButton{
-				Text: "Submit code",
-				OnClicked: func() {
-					body, _ := json.Marshal(MFABody{Type: "multifactor", Code: outLECode.Text(), RememberDevice: false})
-					req, _ := http.NewRequest("PUT", "https://auth.riotgames.com/api/v1/authorization", bytes.NewBuffer(body))
-					setRequestHeaders(req)
-					res, err := client.Do(req)
-					if err != nil {
-						walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
-					}
-					defer res.Body.Close()
-					var accessTokenContainer AccessTokenContainer
-					data, _ := io.ReadAll(res.Body)
-					err = json.Unmarshal(data, &accessTokenContainer)
-					if err != nil {
-						walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
-					}
-					accessToken = accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
-					mfa.Close(0)
+	globalStore.Ui.mainWindow.WindowBase.Synchronize(func(){
+		Dialog{
+			AssignTo: &mfa,
+			Title:    "Multi-factor authentication enabled",
+			MinSize:  Size{Width: 200, Height: 250},
+			Layout:   VBox{},
+			Children: []Widget{
+				Label{
+					Text: "Please enter MFA code given by Riot Games",
+				},
+				LineEdit{
+					AssignTo:  &outLECode,
+					Name:      "MFA code",
+					MaxLength: codeLength,
+				},
+				PushButton{
+					Text: "Submit code",
+					OnClicked: func() {
+						body, _ := json.Marshal(MFABody{Type: "multifactor", Code: outLECode.Text(), RememberDevice: false})
+						req, _ := http.NewRequest("PUT", "https://auth.riotgames.com/api/v1/authorization", bytes.NewBuffer(body))
+						setRequestHeaders(req)
+						res, err := client.Do(req)
+						if err != nil {
+							walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
+						}
+						defer res.Body.Close()
+						var accessTokenContainer AccessTokenContainer
+						data, _ := io.ReadAll(res.Body)
+						err = json.Unmarshal(data, &accessTokenContainer)
+						if err != nil {
+							walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
+						}
+						accessToken = accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
+						mfa.Close(-1)
+					},
 				},
 			},
-		},
-	}.Run(owner)
+		}.Create(owner)
+		mfa.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
+			if mfa.Result() != -1 {
+				os.Exit(0)
+			}
+		})
+		mfa.Run()
+	})
 	return accessToken
 }
 
 func handleCron() {
 	c := cron.New()
 	c.AddFunc("0 0 2 ? * *", func() {
-		fmt.Println("works")
 		seedUser()
 		notifyUserIfTheyHaveWantedSkins(globalStore.Ui.notifyIcon)
 	})
@@ -316,8 +332,11 @@ func main() {
 		},
 	}.Create()
 	createNotifyIcon()
-	go seedUser()
+	go seedUser() 
 	go feedData()
 	go handleCron()
 	globalStore.Ui.mainWindow.Run()
 }
+
+
+    

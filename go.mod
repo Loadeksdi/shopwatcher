@@ -15,6 +15,7 @@ require (
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
 	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
+	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29 // indirect
 	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/Knetic/govaluate.v3 v3.0.0 // indirect

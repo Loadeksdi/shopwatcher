@@ -4,7 +4,7 @@ A simple executable written in Go to check if any of your Valorant skins in your
 
 ## Requirements
 - Windows as OS
-- A valid Riot account
+- A valid Riot account (without MFA enabled is preferred)
 - Internet
 - that's basically it...
 

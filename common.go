@@ -6,14 +6,15 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/lxn/walk"
 )
 
 type User struct {
-	Login    string
-	Password string
-	Region   string
+	Login       string
+	Password    string
+	Region      string
 	AccessToken string
 }
 
@@ -104,9 +105,13 @@ type UiElems struct {
 }
 
 type GlobalStore struct {
-	Ui            UiElems
-	CurrentShop   []Skin
-	User          User
+	Ui          UiElems
+	CurrentShop []Skin
+	User        User
+	Channels    struct {
+		NewToken    chan string
+		LoginWindow chan bool
+	}
 }
 
 type Response struct {
@@ -115,7 +120,7 @@ type Response struct {
 
 type Skin struct {
 	Name           string
-	LocalizedNames map[string]string
+	LocalizedNames SynchronizedMap
 	Id             string
 	AssetName      string
 	AssetPath      string
@@ -123,6 +128,9 @@ type Skin struct {
 }
 
 type SortedSkins []Skin
+type SynchronizedMap struct {
+	*sync.Map
+}
 
 type SkinNameVideo struct {
 	Name  string
@@ -138,12 +146,14 @@ func (s SortedSkins) Swap(i, j int) {
 }
 
 func (s SortedSkins) Less(i, j int) bool {
-	if _, ok := s[i].LocalizedNames[locale]; !ok {
+	if _, ok := s[i].LocalizedNames.Load(locale); !ok {
 		locale = "en-US"
 	}
-	localizedSlice := []string{s[i].LocalizedNames[locale], s[j].LocalizedNames[locale]}
+	res1, _ := s[i].LocalizedNames.Load(locale)
+	res2, _ := s[j].LocalizedNames.Load(locale)
+	localizedSlice := []string{res1.(string), res2.(string)}
 	sort.Strings(localizedSlice)
-	return localizedSlice[0] == s[i].LocalizedNames[locale]
+	return localizedSlice[0] == res1
 }
 
 func setRequestHeaders(req *http.Request) *http.Request {
@@ -164,5 +174,18 @@ func (urlVar *ParsedURL) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	urlVar.URL = parsedUrl
+	return nil
+}
+
+func (syncMap *SynchronizedMap) UnmarshalJSON(data []byte) error {
+	var dataMap map[string]string
+	syncMap.Map = &sync.Map{}
+	err := json.Unmarshal(data, &dataMap)
+	if err != nil {
+		return err
+	}
+	for key, value := range dataMap {
+		syncMap.Store(key, value)
+	}
 	return nil
 }

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -30,11 +30,11 @@ func loadSavedUser() (User, error) {
 		decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
 		blob, _ := decoder.Bytes(cred.CredentialBlob)
 		if err != nil {
-			fmt.Println(err)
+			log.Fatal(err)
 		}
 		s := strings.Split(string(blob), "\x00")
-		if s[2] == "" {
-			return user, errors.New("No access token")
+		if s[2] != "" {
+			return user, errors.New("no access token")
 		}
 		user = User{cred.UserName, s[0], s[1], s[2]}
 	}
@@ -56,13 +56,13 @@ func saveUserData(user User) {
 	}
 }
 
-func getAccessToken() (string, error) {
+func getAccessToken() {
 	body, _ := json.Marshal(AuthBody{Client_id: "play-valorant-web-prod", Nonce: 1, Redirect_uri: "https://playvalorant.com/opt_in", Response_type: "token id_token", Scope: "account openid"})
 	req, _ := http.NewRequest("POST", "https://auth.riotgames.com/api/v1/authorization", bytes.NewBuffer(body))
 	setRequestHeaders(req)
 	res, err := client.Do(req)
 	if err != nil {
-		return "", err
+		log.Fatal(err)
 	}
 	defer res.Body.Close()
 	body, _ = json.Marshal(UserBody{Type: "auth", Username: globalStore.User.Login, Password: globalStore.User.Password})
@@ -70,11 +70,11 @@ func getAccessToken() (string, error) {
 	setRequestHeaders(req)
 	res, err = client.Do(req)
 	if err != nil {
-		return "", err
+		log.Fatal(err)
 	}
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
-		return "", err
+		log.Fatal(err)
 	}
 	defer res.Body.Close()
 	var accessToken string
@@ -86,25 +86,25 @@ func getAccessToken() (string, error) {
 		var mfaResponse MFAResponse
 		json.Unmarshal(data, &mfaResponse)
 		accessToken = drawMfaModal(globalStore.Ui.mainWindow, mfaResponse.Multifactor.MultiFactorCodeLength)
-	} else {
-		return "", errors.New(accessTokenContainer.Type)
 	}
-	return accessToken, nil
+	globalStore.User.AccessToken = accessToken
+	globalStore.Channels.NewToken <- accessToken
 }
 
 func seedUser() {
-	var accessToken string
+	globalStore.Channels.NewToken = make(chan string)
+	globalStore.Channels.LoginWindow = make(chan bool)
 	var err error
 	if globalStore.User.Login == "" {
-		accessToken = drawUserform(globalStore.Ui.mainWindow)
-	} else {
-		accessToken, err = getAccessToken()
+		go drawUserform(globalStore.Ui.mainWindow)
+		<-globalStore.Channels.LoginWindow
 	}
+	go getAccessToken()
+	<-globalStore.Channels.NewToken
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not call Riot servers", walk.MsgBoxIconError)
 	}
-	globalStore.User.AccessToken = accessToken
-	globalStore.CurrentShop, err = fetchSkinsWithToken(accessToken)
+	globalStore.CurrentShop, err = fetchSkinsWithToken(globalStore.User.AccessToken)
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not fetch skins", walk.MsgBoxIconError)
 	}

@@ -47,7 +47,7 @@ var client = &http.Client{Jar: cj, Transport: customTransport}
 
 func fetchSkins() ([]Skin, error) {
 	req, _ := http.NewRequest("GET", "https://eu.api.riotgames.com/val/content/v1/contents?locale="+locale, nil)
-	apiKey, err := base64.StdEncoding.DecodeString("UkdBUEktODk1MDYxNTctMWYzNS00MjgzLTg4NDktMWI1ODY2NjE4MzY2")
+	apiKey, err := base64.StdEncoding.DecodeString("UkdBUEktODZhNGQ0NmEtYTg2Yy00MzU1LWE0YzAtMGU5NTQ0ODJiYzg0")
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +134,7 @@ func fetchSkinsWithToken(accessToken string) ([]Skin, error) {
 	req.Header.Set("Content-Type", "application/json")
 	res, err := client.Do(req)
 	if err != nil {
-		globalStore.User.AccessToken, _ = getAccessToken()
-		fetchSkinsWithToken(globalStore.User.AccessToken)
+		return nil, err
 	}
 	defer res.Body.Close()
 	var entitlementResponse EntitlementResponse
