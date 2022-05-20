@@ -36,7 +36,12 @@ func loadSavedUser() (User, error) {
 		if s[2] != "" {
 			return user, errors.New("no access token")
 		}
-		user = User{cred.UserName, s[0], s[1], s[2]}
+		if !isAccessTokenValid(s[2]) {
+			getAccessToken()
+			user = User{cred.UserName, s[0], s[1], globalStore.User.AccessToken}
+		} else {
+			user = User{cred.UserName, s[0], s[1], s[2]}
+		}
 	}
 	return user, err
 }
@@ -85,15 +90,19 @@ func getAccessToken() {
 	} else if accessTokenContainer.Type == "multifactor" {
 		var mfaResponse MFAResponse
 		json.Unmarshal(data, &mfaResponse)
-		accessToken = drawMfaModal(globalStore.Ui.mainWindow, mfaResponse.Multifactor.MultiFactorCodeLength)
+		drawMfaModal(globalStore.Ui.mainWindow, mfaResponse.Multifactor.MultiFactorCodeLength)
 	}
 	globalStore.User.AccessToken = accessToken
-	globalStore.Channels.NewToken <- accessToken
+	select {
+	case globalStore.Channels.NewToken <- accessToken:
+		return
+	default:
+		return
+	}
+
 }
 
 func seedUser() {
-	globalStore.Channels.NewToken = make(chan string)
-	globalStore.Channels.LoginWindow = make(chan bool)
 	var err error
 	if globalStore.User.Login == "" {
 		go drawUserform(globalStore.Ui.mainWindow)
@@ -109,4 +118,15 @@ func seedUser() {
 		walk.MsgBox(nil, "Error", "The app could not fetch skins", walk.MsgBoxIconError)
 	}
 	drawShop()
+}
+
+func isAccessTokenValid(accessToken string) bool {
+	req, _ := http.NewRequest("POST", "https://entitlements.auth.riotgames.com/api/token/v1", nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil || res.Status != "200 OK" {
+		return false
+	}
+	return true
 }

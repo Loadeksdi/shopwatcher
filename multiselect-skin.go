@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/lxn/walk"
@@ -21,10 +20,6 @@ func (m *MultiSelectList) ItemCount() int {
 func (m *MultiSelectList) Value(index int) interface{} {
 	var skinName any
 	var ok bool
-	m.AllSkins[index].LocalizedNames.Range(func(key any, value any) bool{
-		fmt.Println(key, value)
-		return true
-	})
 	if skinName, ok = m.AllSkins[index].LocalizedNames.Load(locale); !ok {
 		skinName, _ = m.AllSkins[index].LocalizedNames.Load("en-US")
 	}

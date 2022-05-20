@@ -111,6 +111,7 @@ type GlobalStore struct {
 	Channels    struct {
 		NewToken    chan string
 		LoginWindow chan bool
+		MFAToken    chan bool
 	}
 }
 
@@ -188,4 +189,13 @@ func (syncMap *SynchronizedMap) UnmarshalJSON(data []byte) error {
 		syncMap.Store(key, value)
 	}
 	return nil
+}
+
+func (syncMap *SynchronizedMap) MarshalJSON() ([]byte, error) {
+	dataMap := make(map[string]string)
+	syncMap.Range(func(key any, value any) bool {
+		dataMap[key.(string)] = value.(string)
+		return true
+	})
+	return json.Marshal(dataMap)
 }

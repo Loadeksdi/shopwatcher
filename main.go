@@ -14,6 +14,7 @@ import (
 	"github.com/emersion/go-autostart"
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
+	"github.com/lxn/win"
 	"github.com/robfig/cron"
 )
 
@@ -35,10 +36,10 @@ func createNotifyIcon() {
 		log.Fatal(err)
 	}
 	ni.MouseDown().Attach(func(x, y int, button walk.MouseButton) {
-		if button != walk.LeftButton {
-			return
+		if button == walk.LeftButton {
+			globalStore.Ui.mainWindow.Show()
+			win.ShowWindow(globalStore.Ui.mainWindow.Handle(), win.SW_RESTORE)
 		}
-
 	})
 	exitAction := walk.NewAction()
 	if err := exitAction.SetText("Exit"); err != nil {
@@ -79,7 +80,7 @@ func notifyUserIfTheyHaveWantedSkins(notifyIcon *walk.NotifyIcon) {
 		for _, storeSkin := range globalStore.CurrentShop {
 			if skin.Id == storeSkin.Id {
 				skinLocalizedName, _ := skin.LocalizedNames.Load(locale)
-				notifyIcon.ShowInfo("Valorant Shopwatcher", skinLocalizedName.(string) + " is available in your Valorant shop!")
+				notifyIcon.ShowInfo("Valorant Shopwatcher", skinLocalizedName.(string)+" is available in your Valorant shop!")
 			}
 		}
 	}
@@ -90,12 +91,13 @@ func drawUserform(owner walk.Form) {
 	var outLELogin *walk.LineEdit
 	var outLEPassword *walk.LineEdit
 	var outCBRegion *walk.ComboBox
-	globalStore.Ui.mainWindow.WindowBase.Synchronize(func(){
+	globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
 		Dialog{
 			AssignTo: &userForm,
 			Title:    "Login",
 			MinSize:  Size{Width: 200, Height: 250},
 			Layout:   VBox{},
+			Icon:    "winres/icon.ico",
 			Children: []Widget{
 				Composite{
 					Layout: HBox{},
@@ -142,7 +144,7 @@ func drawUserform(owner walk.Form) {
 						var err error
 						if err != nil {
 							walk.MsgBox(nil, "Error", "Invalid credentials", walk.MsgBoxIconError)
-							globalStore.Ui.mainWindow.WindowBase.Synchronize(func(){
+							globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
 								userForm.Run()
 							})
 							return
@@ -171,16 +173,16 @@ func drawShop() {
 	}
 }
 
-func drawMfaModal(owner walk.Form, codeLength int) string {
+func drawMfaModal(owner walk.Form, codeLength int) {
 	var outLECode *walk.LineEdit
-	var accessToken string
 	var mfa *walk.Dialog
-	globalStore.Ui.mainWindow.WindowBase.Synchronize(func(){
+	globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
 		Dialog{
 			AssignTo: &mfa,
 			Title:    "Multi-factor authentication enabled",
 			MinSize:  Size{Width: 200, Height: 250},
 			Layout:   VBox{},
+			Icon:    "winres/icon.ico",
 			Children: []Widget{
 				Label{
 					Text: "Please enter MFA code given by Riot Games",
@@ -207,7 +209,8 @@ func drawMfaModal(owner walk.Form, codeLength int) string {
 						if err != nil {
 							walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
 						}
-						accessToken = accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
+						globalStore.User.AccessToken = accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
+						globalStore.Channels.MFAToken <- true
 						mfa.Close(-1)
 					},
 				},
@@ -220,10 +223,10 @@ func drawMfaModal(owner walk.Form, codeLength int) string {
 		})
 		mfa.Run()
 	})
-	return accessToken
+	<-globalStore.Channels.MFAToken
 }
 
-func handleCron() {
+func startCron() {
 	c := cron.New()
 	c.AddFunc("0 0 2 ? * *", func() {
 		seedUser()
@@ -232,9 +235,7 @@ func handleCron() {
 	c.Start()
 }
 
-//go:generate go-winres make --product-version=dev
-
-func main() {
+func runAppOnStartup() {
 	var appExec string
 	var err error
 	if appExec, err = os.Executable(); err != nil {
@@ -252,16 +253,37 @@ func main() {
 	if err := app.Enable(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func setupChannels(){
+	globalStore.Channels.MFAToken = make(chan bool)
+	globalStore.Channels.NewToken = make(chan string)
+	globalStore.Channels.LoginWindow = make(chan bool)
+}
+//go:generate go-winres make --product-version=dev
+
+func main() {
+	runAppOnStartup()
+	var err error
 	if locale, err = lang.DetectIETF(); err != nil {
 		locale = "en-US"
 	}
+	setupChannels()
 	globalStore.User, _ = loadSavedUser()
 	loadSavedSkins()
+	rect := win.RECT{}
+	win.GetWindowRect(win.GetDesktopWindow(), &rect)
 	MainWindow{
 		AssignTo: &globalStore.Ui.mainWindow,
 		Title:    "Valorant Shopwatcher",
-		MinSize:  Size{Width: 600, Height: 400},
 		Layout:   VBox{},
+		Bounds:   Rectangle{X: int(rect.Right)/2 - 700, Y: int(rect.Bottom)/2 - 400, Width: 1400, Height: 800},
+		OnSizeChanged: func() {
+			if win.IsIconic(globalStore.Ui.mainWindow.Handle()) {
+				globalStore.Ui.mainWindow.Hide()
+			}
+		},
+		Icon: "winres/icon.ico",
 		Children: []Widget{
 			Composite{
 				Layout: HBox{},
@@ -332,11 +354,8 @@ func main() {
 		},
 	}.Create()
 	createNotifyIcon()
-	go seedUser() 
+	go seedUser()
 	go feedData()
-	go handleCron()
+	go startCron()
 	globalStore.Ui.mainWindow.Run()
 }
-
-
-    
