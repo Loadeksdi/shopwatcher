@@ -27,11 +27,6 @@ func createNotifyIcon() {
 		log.Fatal(err)
 	}
 	ni.SetToolTip("Valorant Shopwatcher - Currently running")
-	icon, err := walk.Resources.Icon("winres/icon.ico")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = ni.SetIcon(icon)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -97,7 +92,6 @@ func drawUserform(owner walk.Form) {
 			Title:    "Login",
 			MinSize:  Size{Width: 200, Height: 250},
 			Layout:   VBox{},
-			Icon:    "winres/icon.ico",
 			Children: []Widget{
 				Composite{
 					Layout: HBox{},
@@ -182,7 +176,6 @@ func drawMfaModal(owner walk.Form, codeLength int) {
 			Title:    "Multi-factor authentication enabled",
 			MinSize:  Size{Width: 200, Height: 250},
 			Layout:   VBox{},
-			Icon:    "winres/icon.ico",
 			Children: []Widget{
 				Label{
 					Text: "Please enter MFA code given by Riot Games",
@@ -283,7 +276,6 @@ func main() {
 				globalStore.Ui.mainWindow.Hide()
 			}
 		},
-		Icon: "winres/icon.ico",
 		Children: []Widget{
 			Composite{
 				Layout: HBox{},
