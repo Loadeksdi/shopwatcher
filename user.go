@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -33,9 +32,6 @@ func loadSavedUser() (User, error) {
 			log.Fatal(err)
 		}
 		s := strings.Split(string(blob), "\x00")
-		if s[2] != "" {
-			return user, errors.New("no access token")
-		}
 		if !isAccessTokenValid(s[2]) {
 			getAccessToken()
 			user = User{cred.UserName, s[0], s[1], globalStore.User.AccessToken}
@@ -58,6 +54,9 @@ func saveUserData(user User) {
 	err := cred.Write()
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not save your credentials", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 }
 
@@ -87,14 +86,14 @@ func getAccessToken() {
 	json.Unmarshal(data, &accessTokenContainer)
 	if accessTokenContainer.Type == "response" {
 		accessToken = accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
+		globalStore.User.AccessToken = accessToken
 	} else if accessTokenContainer.Type == "multifactor" {
 		var mfaResponse MFAResponse
 		json.Unmarshal(data, &mfaResponse)
 		drawMfaModal(globalStore.Ui.mainWindow, mfaResponse.Multifactor.MultiFactorCodeLength)
 	}
-	globalStore.User.AccessToken = accessToken
 	select {
-	case globalStore.Channels.NewToken <- accessToken:
+	case globalStore.Channels.NewToken <- globalStore.User.AccessToken:
 		return
 	default:
 		return
@@ -108,14 +107,22 @@ func seedUser() {
 		go drawUserform(globalStore.Ui.mainWindow)
 		<-globalStore.Channels.LoginWindow
 	}
-	go getAccessToken()
+	if !isAccessTokenValid(globalStore.User.AccessToken) {
+		go getAccessToken()
+	}
 	<-globalStore.Channels.NewToken
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not call Riot servers", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 	globalStore.CurrentShop, err = fetchSkinsWithToken(globalStore.User.AccessToken)
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not fetch skins", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 	drawShop()
 }

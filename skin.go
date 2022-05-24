@@ -47,7 +47,7 @@ var client = &http.Client{Jar: cj, Transport: customTransport}
 
 func fetchSkins() ([]Skin, error) {
 	req, _ := http.NewRequest("GET", "https://eu.api.riotgames.com/val/content/v1/contents?locale="+locale, nil)
-	apiKey, err := base64.StdEncoding.DecodeString("UkdBUEktMzc4MzdmYTItZmM1NS00MzYxLWE3NmUtNDdiNWE0YzlmNTE1")
+	apiKey, err := base64.StdEncoding.DecodeString("UkdBUEktYmRiMThjY2MtYmE2My00MjFiLTk3MGEtYjM4NjEzOTdjMjY4")
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +71,9 @@ func loadSavedSkins() {
 	err := json.Unmarshal(file, &savedSkins)
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not load saved skins", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 	globalStore.Ui.selectedSkinsListBox.AllSkins = savedSkins
 }
@@ -79,6 +82,9 @@ func feedData() {
 	res, err := fetchSkins()
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not fetch skins", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 	globalStore.Ui.skinsListBox.FeedList(res)
 }
@@ -87,6 +93,9 @@ func saveSkinsData() {
 	json, err := json.MarshalIndent(globalStore.Ui.selectedSkinsListBox.AllSkins, "", "  ")
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not save the data", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 	if _, err := os.Stat("saves"); os.IsNotExist(err) {
 		os.Mkdir("saves", 0777)
@@ -94,6 +103,9 @@ func saveSkinsData() {
 	err = ioutil.WriteFile("saves/skins.json", json, 0644)
 	if err != nil {
 		walk.MsgBox(nil, "Error", "The app could not save the data", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 }
 
@@ -146,6 +158,9 @@ func fetchSkinsWithToken(accessToken string) ([]Skin, error) {
 	res, err = client.Do(req)
 	if err != nil {
 		walk.MsgBox(nil, "Error", "Couldn't fetch account information", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 	defer res.Body.Close()
 	var userId UserId
@@ -157,16 +172,25 @@ func fetchSkinsWithToken(accessToken string) ([]Skin, error) {
 	res, err = client.Do(req)
 	if err != nil {
 		walk.MsgBox(nil, "Error", "Couldn't fetch account information", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 	defer res.Body.Close()
 	var shop Shop
 	err = json.NewDecoder(res.Body).Decode(&shop)
 	if err != nil {
 		walk.MsgBox(nil, "Error", "Couldn't fetch store information", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 	skinsInShop, err := getSkinsInShop(shop, accessToken, entitlementResponse.EntitlementsToken)
 	if err != nil {
 		walk.MsgBox(nil, "Error", "Couldn't fetch skins", walk.MsgBoxIconError)
+		globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+			globalStore.Ui.mainWindow.Show()
+		})
 	}
 	return skinsInShop, nil
 }

@@ -30,6 +30,14 @@ func createNotifyIcon() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	icon, err := walk.Resources.Icon("winres/icon.ico")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = ni.SetIcon(icon)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ni.MouseDown().Attach(func(x, y int, button walk.MouseButton) {
 		if button == walk.LeftButton {
 			globalStore.Ui.mainWindow.Show()
@@ -139,6 +147,7 @@ func drawUserform(owner walk.Form) {
 						if err != nil {
 							walk.MsgBox(nil, "Error", "Invalid credentials", walk.MsgBoxIconError)
 							globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+								globalStore.Ui.mainWindow.Show()
 								userForm.Run()
 							})
 							return
@@ -156,6 +165,7 @@ func drawUserform(owner walk.Form) {
 				saveUserData(globalStore.User)
 			}
 		})
+		globalStore.Ui.mainWindow.Show()
 		userForm.Run()
 	})
 }
@@ -165,6 +175,7 @@ func drawShop() {
 		res, _ := globalStore.CurrentShop[index].LocalizedNames.Load(locale)
 		skinLayout.setData(res.(string), globalStore.CurrentShop[index].Video)
 	}
+	notifyUserIfTheyHaveWantedSkins(globalStore.Ui.notifyIcon)
 }
 
 func drawMfaModal(owner walk.Form, codeLength int) {
@@ -194,6 +205,9 @@ func drawMfaModal(owner walk.Form, codeLength int) {
 						res, err := client.Do(req)
 						if err != nil {
 							walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
+							globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+								globalStore.Ui.mainWindow.Show()
+							})
 						}
 						defer res.Body.Close()
 						var accessTokenContainer AccessTokenContainer
@@ -201,8 +215,12 @@ func drawMfaModal(owner walk.Form, codeLength int) {
 						err = json.Unmarshal(data, &accessTokenContainer)
 						if err != nil {
 							walk.MsgBox(nil, "Error", "Couldn't connect with MFA", walk.MsgBoxIconError)
+							globalStore.Ui.mainWindow.WindowBase.Synchronize(func() {
+								globalStore.Ui.mainWindow.Show()
+							})
 						}
 						globalStore.User.AccessToken = accessTokenContainer.Response.Parameters.Uri.Query().Get("access_token")
+						saveUserData(globalStore.User)
 						globalStore.Channels.MFAToken <- true
 						mfa.Close(-1)
 					},
@@ -214,6 +232,7 @@ func drawMfaModal(owner walk.Form, codeLength int) {
 				os.Exit(0)
 			}
 		})
+		globalStore.Ui.mainWindow.Show()
 		mfa.Run()
 	})
 	<-globalStore.Channels.MFAToken
@@ -248,11 +267,12 @@ func runAppOnStartup() {
 	}
 }
 
-func setupChannels(){
+func setupChannels() {
 	globalStore.Channels.MFAToken = make(chan bool)
 	globalStore.Channels.NewToken = make(chan string)
 	globalStore.Channels.LoginWindow = make(chan bool)
 }
+
 //go:generate go-winres make --product-version=dev
 
 func main() {
@@ -349,5 +369,6 @@ func main() {
 	go seedUser()
 	go feedData()
 	go startCron()
+	globalStore.Ui.mainWindow.Hide()
 	globalStore.Ui.mainWindow.Run()
 }
